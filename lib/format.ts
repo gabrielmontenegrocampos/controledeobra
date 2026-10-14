@@ -30,6 +30,22 @@ export function parseMoeda(s: string): number {
   return isNaN(n) ? 0 : n
 }
 
+/** Como num(), mas sem os zeros sobrando no fim: 12,500 -> "12,5" */
+export function numEnxuto(v: number | null | undefined, max = 3) {
+  const n = Number(v) || 0
+  const s = num(n, max)
+  return s.includes(',') ? s.replace(/,?0+$/, '') : s
+}
+
+/** Deixa passar so o que pode existir num numero enquanto a pessoa digita */
+export function limparNumerico(s: string) {
+  return s.replace(/[^\d.,]/g, '')
+}
+
+export function apenasDigitos(s: string) {
+  return s.replace(/\D/g, '')
+}
+
 export function dataBR(iso: string | null | undefined) {
   if (!iso) return '—'
   const [a, m, d] = iso.slice(0, 10).split('-')

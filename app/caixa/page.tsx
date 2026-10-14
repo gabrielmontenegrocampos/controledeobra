@@ -26,6 +26,7 @@ import {
   Card,
   Carregando,
   Erro,
+  InputMoeda,
   Modal,
   Stat,
   TituloSecao,
@@ -576,11 +577,10 @@ export default function CaixaPage() {
                 />
               </Campo>
               <Campo label="Valor (R$)">
-                <input
-                  className={`${inputCls} tnum text-right font-semibold`}
-                  value={form.valor}
-                  onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                  placeholder="0,00"
+                <InputMoeda
+                  className="font-semibold"
+                  valor={form.valor}
+                  onChange={(v) => setForm({ ...form, valor: v })}
                 />
               </Campo>
               <Campo label="Forma">

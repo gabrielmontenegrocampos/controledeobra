@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import { X, FileDown, Sheet, Plus, AlertTriangle } from 'lucide-react'
 import { supabaseConfigurado } from '@/lib/supabase'
+import { apenasDigitos, limparNumerico, num, numEnxuto, parseMoeda } from '@/lib/format'
 
 export const inputCls =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#1f3a5f] focus:ring-2 focus:ring-[#1f3a5f]/15'
@@ -136,6 +137,137 @@ export function BotaoNovo({ onClick, children }: { onClick: () => void; children
     <button type="button" onClick={onClick} className={btnPrimarioCls}>
       <Plus className="h-4 w-4" /> {children}
     </button>
+  )
+}
+
+/**
+ * Campos numericos do app.
+ *
+ * Enquanto a pessoa digita, so passa o que pode existir num numero.
+ * Ao sair do campo, o valor se ajeita no padrao brasileiro
+ * (1.234,56) — assim ninguem precisa digitar ponto de milhar.
+ */
+export function InputMoeda({
+  valor,
+  onChange,
+  casas = 2,
+  className = '',
+  placeholder = '0,00',
+  readOnly = false,
+}: {
+  valor: string
+  onChange: (v: string) => void
+  casas?: number
+  className?: string
+  placeholder?: string
+  readOnly?: boolean
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={`${inputCls} tnum text-right ${className}`}
+      value={valor}
+      placeholder={placeholder}
+      readOnly={readOnly}
+      onFocus={(e) => !readOnly && e.target.select()}
+      onChange={(e) => onChange(limparNumerico(e.target.value))}
+      onBlur={(e) => {
+        if (readOnly) return
+        const v = parseMoeda(e.target.value)
+        onChange(e.target.value.trim() === '' ? '' : num(v, casas))
+      }}
+    />
+  )
+}
+
+/** Quantidade: ate 3 casas, sem zeros sobrando (12,5 em vez de 12,500) */
+export function InputQuantidade({
+  valor,
+  onChange,
+  className = '',
+  placeholder = '0',
+}: {
+  valor: string
+  onChange: (v: string) => void
+  className?: string
+  placeholder?: string
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={`${inputCls} tnum text-right ${className}`}
+      value={valor}
+      placeholder={placeholder}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => onChange(limparNumerico(e.target.value))}
+      onBlur={(e) => {
+        const v = parseMoeda(e.target.value)
+        onChange(e.target.value.trim() === '' ? '' : numEnxuto(v, 3))
+      }}
+    />
+  )
+}
+
+/** So digitos — numero de nota, temperatura e afins */
+export function InputDigitos({
+  valor,
+  onChange,
+  className = '',
+  placeholder,
+  max,
+}: {
+  valor: string
+  onChange: (v: string) => void
+  className?: string
+  placeholder?: string
+  max?: number
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      className={`${inputCls} ${className}`}
+      value={valor}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const d = apenasDigitos(e.target.value)
+        onChange(max ? d.slice(0, max) : d)
+      }}
+    />
+  )
+}
+
+/** Percentual de 0 a 100, com uma casa */
+export function InputPercentual({
+  valor,
+  onChange,
+  className = '',
+}: {
+  valor: string
+  onChange: (v: string) => void
+  className?: string
+}) {
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        inputMode="decimal"
+        className={`${inputCls} tnum pr-6 text-right ${className}`}
+        value={valor}
+        placeholder="0"
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => onChange(limparNumerico(e.target.value))}
+        onBlur={(e) => {
+          const v = Math.max(0, Math.min(100, parseMoeda(e.target.value)))
+          onChange(e.target.value.trim() === '' ? '0' : numEnxuto(v, 1))
+        }}
+      />
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+        %
+      </span>
+    </div>
   )
 }
 

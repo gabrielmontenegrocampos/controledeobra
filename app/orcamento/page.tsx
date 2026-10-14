@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Trash2, Save, Pencil, Plus, CornerDownRight } from 'lucide-react'
 import { supabase, mensagemErro } from '@/lib/supabase'
-import { brl, num, parseMoeda, pct } from '@/lib/format'
+import { brl, limparNumerico, num, numEnxuto, parseMoeda, pct } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import { achatar, montarArvore, totaisGerais, type NoEtapa } from '@/lib/etapas'
 import type { EtapaResumo } from '@/lib/types'
@@ -16,6 +16,7 @@ import {
   Card,
   Carregando,
   Erro,
+  InputMoeda,
   Modal,
   Stat,
   TituloSecao,
@@ -265,10 +266,16 @@ export default function OrcamentoPage() {
                         ) : (
                           <input
                             type="text"
+                            inputMode="decimal"
                             defaultValue={num(n.valor_previsto)}
                             className={`${inputCls} tnum w-32 text-right`}
+                            onFocus={(ev) => ev.target.select()}
+                            onChange={(ev) => {
+                              ev.target.value = limparNumerico(ev.target.value)
+                            }}
                             onBlur={(ev) => {
                               const v = parseMoeda(ev.target.value)
+                              ev.target.value = num(v)
                               if (v !== Number(n.valor_previsto)) salvarCampo(n.id, 'valor_previsto', v)
                             }}
                           />
@@ -313,14 +320,17 @@ export default function OrcamentoPage() {
                           </span>
                         ) : (
                           <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={5}
-                            defaultValue={Number(n.perc_avanco)}
+                            type="text"
+                            inputMode="decimal"
+                            defaultValue={numEnxuto(n.perc_avanco, 1)}
                             className={`${inputCls} tnum w-20 text-center`}
+                            onFocus={(ev) => ev.target.select()}
+                            onChange={(ev) => {
+                              ev.target.value = limparNumerico(ev.target.value)
+                            }}
                             onBlur={(ev) => {
-                              const v = Math.max(0, Math.min(100, Number(ev.target.value) || 0))
+                              const v = Math.max(0, Math.min(100, parseMoeda(ev.target.value)))
+                              ev.target.value = numEnxuto(v, 1)
                               if (v !== Number(n.perc_avanco)) salvarCampo(n.id, 'perc_avanco', v)
                             }}
                           />
@@ -431,11 +441,9 @@ export default function OrcamentoPage() {
 
           {!form.id && (
             <Campo label="Valor previsto (R$)">
-              <input
-                className={`${inputCls} tnum`}
-                value={form.valor_previsto}
-                onChange={(e) => setForm({ ...form, valor_previsto: e.target.value })}
-                placeholder="0,00"
+              <InputMoeda
+                valor={form.valor_previsto}
+                onChange={(v) => setForm({ ...form, valor_previsto: v })}
               />
             </Campo>
           )}

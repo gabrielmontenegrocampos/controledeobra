@@ -5,7 +5,7 @@ import { Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Load
 import { supabase, enviarArquivo, mensagemErro } from '@/lib/supabase'
 import { lerNFe } from '@/lib/nfe'
 import { comDescendentes, nomeCompleto } from '@/lib/etapas'
-import { brl, dataBR, hoje, num, parseMoeda, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
+import { brl, dataBR, hoje, num, numEnxuto, parseMoeda, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { Casa, Etapa, Investidor, Lancamento, StatusLancamento, TipoLancamento } from '@/lib/types'
 import { Anexo } from '@/components/anexo'
@@ -18,6 +18,9 @@ import {
   Card,
   Carregando,
   Erro,
+  InputDigitos,
+  InputMoeda,
+  InputQuantidade,
   Modal,
   Stat,
   TituloSecao,
@@ -241,8 +244,8 @@ export default function LancamentosPage() {
         itens: nota.itens.map((i) => ({
           material: i.material,
           unidade: i.unidade,
-          quantidade: String(i.quantidade),
-          valor_unit: num(i.valor_unit, 4),
+          quantidade: numEnxuto(i.quantidade, 3),
+          valor_unit: numEnxuto(i.valor_unit, 4),
         })),
       }))
 
@@ -730,7 +733,12 @@ export default function LancamentosPage() {
             <input className={inputCls} value={form.fornecedor} onChange={(e) => setForm({ ...form, fornecedor: e.target.value })} placeholder="Ex.: Depósito Lagoa Materiais" />
           </Campo>
           <Campo label="Nº da nota fiscal">
-            <input className={inputCls} value={form.nf_numero} onChange={(e) => setForm({ ...form, nf_numero: e.target.value })} placeholder="Ex.: 12345" />
+            <InputDigitos
+              valor={form.nf_numero}
+              onChange={(v) => setForm({ ...form, nf_numero: v })}
+              placeholder="Ex.: 12345"
+              max={20}
+            />
           </Campo>
 
           <Campo label="Descrição" className="sm:col-span-3">
@@ -779,14 +787,13 @@ export default function LancamentosPage() {
             }
           >
             <div className="flex items-center gap-2">
-              <input
-                className={`${inputCls} tnum text-right text-base font-semibold ${
+              <InputMoeda
+                className={`text-base font-semibold ${
                   form.valorAuto && form.itens.length > 0 ? 'bg-gray-100' : ''
                 }`}
-                value={form.valorAuto && form.itens.length > 0 ? num(totalItens) : form.valor}
+                valor={form.valorAuto && form.itens.length > 0 ? num(totalItens) : form.valor}
                 readOnly={form.valorAuto && form.itens.length > 0}
-                onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                placeholder="0,00"
+                onChange={(v) => setForm({ ...form, valor: v })}
               />
               {form.itens.length > 0 && (
                 <button
@@ -856,25 +863,24 @@ export default function LancamentosPage() {
                       />
                     </div>
                     <div className="col-span-4 sm:col-span-2">
-                      <input
-                        className={`${inputCls} tnum text-right`}
+                      <InputQuantidade
                         placeholder="Qtd"
-                        value={item.quantidade}
-                        onChange={(e) => {
+                        valor={item.quantidade}
+                        onChange={(v) => {
                           const itens = [...form.itens]
-                          itens[idx] = { ...item, quantidade: e.target.value }
+                          itens[idx] = { ...item, quantidade: v }
                           setForm({ ...form, itens })
                         }}
                       />
                     </div>
                     <div className="col-span-5 sm:col-span-2">
-                      <input
-                        className={`${inputCls} tnum text-right`}
+                      <InputMoeda
+                        casas={4}
                         placeholder="Valor unit."
-                        value={item.valor_unit}
-                        onChange={(e) => {
+                        valor={item.valor_unit}
+                        onChange={(v) => {
                           const itens = [...form.itens]
-                          itens[idx] = { ...item, valor_unit: e.target.value }
+                          itens[idx] = { ...item, valor_unit: v }
                           setForm({ ...form, itens })
                         }}
                       />
