@@ -1,15 +1,30 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const PLACEHOLDER = 'https://placeholder.supabase.co'
 
-/** false quando as variaveis de ambiente nao foram configuradas ainda */
+/**
+ * Limpa e valida a URL vinda da variavel de ambiente.
+ * Se o valor estiver vazio ou mal formado (colado sem https://, com espaco
+ * ou quebra de linha), cai no placeholder em vez de derrubar o build.
+ */
+function urlValida(valor: string | undefined) {
+  const limpo = (valor || '').trim().replace(/\/+$/, '')
+  if (!limpo) return null
+  try {
+    const u = new URL(limpo)
+    return u.protocol === 'https:' || u.protocol === 'http:' ? limpo : null
+  } catch {
+    return null
+  }
+}
+
+const url = urlValida(process.env.NEXT_PUBLIC_SUPABASE_URL)
+const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
+
+/** false quando as variaveis de ambiente estao ausentes ou invalidas */
 export const supabaseConfigurado = Boolean(url && key)
 
-export const supabase = createClient(
-  url || 'https://placeholder.supabase.co',
-  key || 'placeholder-anon-key'
-)
+export const supabase = createClient(url || PLACEHOLDER, key || 'placeholder-anon-key')
 
 export const BUCKET = 'anexos'
 
