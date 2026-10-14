@@ -162,16 +162,23 @@ export function InputMoeda({
   placeholder?: string
   readOnly?: boolean
 }) {
+  // Mascara de banco: conta so os digitos e vai enchendo da direita
+  // para a esquerda, formatando a cada tecla. 389000 -> 3.890,00
+  function aoDigitar(bruto: string) {
+    const digitos = bruto.replace(/\D/g, '').slice(0, 15)
+    if (!digitos) return onChange('')
+    onChange(num(Number(digitos) / 100, 2))
+  }
+
   return (
     <input
       type="text"
-      inputMode="decimal"
+      inputMode="numeric"
       className={`${inputCls} tnum text-right ${className}`}
       value={valor}
       placeholder={placeholder}
       readOnly={readOnly}
-      onFocus={(e) => !readOnly && e.target.select()}
-      onChange={(e) => onChange(limparNumerico(e.target.value))}
+      onChange={(e) => !readOnly && aoDigitar(e.target.value)}
       onBlur={(e) => {
         if (readOnly) return
         const v = parseMoeda(e.target.value)

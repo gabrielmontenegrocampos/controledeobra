@@ -289,7 +289,8 @@ export default function OrcamentoPage() {
                             className={`${inputCls} tnum w-32 text-right`}
                             onFocus={(ev) => ev.target.select()}
                             onChange={(ev) => {
-                              ev.target.value = limparNumerico(ev.target.value)
+                              const d = ev.target.value.replace(/\D/g, '').slice(0, 15)
+                              ev.target.value = d ? num(Number(d) / 100, 2) : ''
                             }}
                             onBlur={(ev) => {
                               const v = parseMoeda(ev.target.value)
@@ -481,7 +482,7 @@ export default function OrcamentoPage() {
           </Campo>
 
           {!form.id && (
-            <Campo label="Valor previsto (R$)">
+            <Campo label="Valor previsto (R$)" dica="Digite só os números: 25000 vira 250,00">
               <InputMoeda
                 valor={form.valor_previsto}
                 onChange={(v) => setForm({ ...form, valor_previsto: v })}

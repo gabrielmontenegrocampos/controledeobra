@@ -1104,7 +1104,7 @@ export default function LancamentosPage() {
                 ? form.valorAuto
                   ? 'Somando os itens abaixo'
                   : `Soma dos itens: ${brl(totalItens)}`
-                : undefined
+                : 'Digite só os números, os centavos entram sozinhos'
             }
           >
             <div className="flex items-center gap-2">
@@ -1316,7 +1316,7 @@ export default function LancamentosPage() {
             </select>
           </Campo>
 
-          <Campo label="Valor total da compra (R$)">
+          <Campo label="Valor total da compra (R$)" dica="Só números: 18000000 vira 180.000,00">
             <InputMoeda
               className="font-semibold"
               valor={formParcela.valor_total}

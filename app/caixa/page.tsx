@@ -576,7 +576,7 @@ export default function CaixaPage() {
                   onChange={(e) => setForm({ ...form, data: e.target.value })}
                 />
               </Campo>
-              <Campo label="Valor (R$)">
+              <Campo label="Valor (R$)" dica="Digite só os números, os centavos entram sozinhos">
                 <InputMoeda
                   className="font-semibold"
                   valor={form.valor}
