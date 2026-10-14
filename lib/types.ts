@@ -19,6 +19,7 @@ export type Etapa = {
   valor_previsto: number
   perc_avanco: number
   ordem: number
+  etapa_pai_id: string | null
 }
 
 export type EtapaResumo = Etapa & {

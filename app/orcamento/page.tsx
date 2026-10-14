@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Trash2, Save } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Trash2, Save, Pencil, Plus, CornerDownRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { brl, num, parseMoeda, pct } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
+import { achatar, montarArvore, totaisGerais, type NoEtapa } from '@/lib/etapas'
 import type { EtapaResumo } from '@/lib/types'
 import {
   AvisoConfig,
@@ -19,9 +20,27 @@ import {
   Stat,
   TituloSecao,
   Vazio,
+  btnCls,
   btnPrimarioCls,
   inputCls,
 } from '@/components/ui'
+
+type FormEtapa = {
+  id?: string
+  nome: string
+  grupo: string
+  valor_previsto: string
+  ordem: string
+  etapa_pai_id: string
+}
+
+const FORM_VAZIO: FormEtapa = {
+  nome: '',
+  grupo: '',
+  valor_previsto: '',
+  ordem: '',
+  etapa_pai_id: '',
+}
 
 export default function OrcamentoPage() {
   const [etapas, setEtapas] = useState<EtapaResumo[]>([])
@@ -29,13 +48,10 @@ export default function OrcamentoPage() {
   const [erro, setErro] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
   const [salvando, setSalvando] = useState(false)
-  const [nova, setNova] = useState({ nome: '', grupo: '', valor_previsto: '', ordem: '' })
+  const [form, setForm] = useState<FormEtapa>(FORM_VAZIO)
 
   const carregar = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('v_etapas_resumo')
-      .select('*')
-      .order('ordem')
+    const { data, error } = await supabase.from('v_etapas_resumo').select('*').order('ordem')
     if (error) setErro(error.message)
     else setEtapas((data as EtapaResumo[]) || [])
     setCarregando(false)
@@ -45,58 +61,93 @@ export default function OrcamentoPage() {
     carregar()
   }, [carregar])
 
+  const arvore = useMemo(() => montarArvore(etapas), [etapas])
+  const linhasArvore = useMemo(() => achatar(arvore), [arvore])
+  const raizes = arvore
+  const totais = totaisGerais(arvore)
+
   async function salvarCampo(id: string, campo: 'valor_previsto' | 'perc_avanco', valor: number) {
     const { error } = await supabase.from('etapas').update({ [campo]: valor }).eq('id', id)
     if (error) setErro(error.message)
     else carregar()
   }
 
-  async function criarEtapa() {
-    if (!nova.nome.trim()) return
-    setSalvando(true)
-    const { error } = await supabase.from('etapas').insert({
-      nome: nova.nome.trim(),
-      grupo: nova.grupo.trim() || null,
-      valor_previsto: parseMoeda(nova.valor_previsto),
-      ordem: Number(nova.ordem) || (etapas.length + 1) * 10,
+  function abrirNova(paiId?: string) {
+    const irmas = paiId
+      ? etapas.filter((e) => e.etapa_pai_id === paiId)
+      : etapas.filter((e) => !e.etapa_pai_id)
+    setForm({
+      ...FORM_VAZIO,
+      etapa_pai_id: paiId || '',
+      ordem: String((irmas.length + 1) * 10),
     })
+    setModal(true)
+  }
+
+  function abrirEdicao(n: NoEtapa) {
+    setForm({
+      id: n.id,
+      nome: n.nome,
+      grupo: n.grupo || '',
+      valor_previsto: num(n.valor_previsto),
+      ordem: String(n.ordem),
+      etapa_pai_id: n.etapa_pai_id || '',
+    })
+    setModal(true)
+  }
+
+  async function salvarEtapa() {
+    if (!form.nome.trim()) return
+    setSalvando(true)
+    setErro(null)
+
+    const payload = {
+      nome: form.nome.trim(),
+      grupo: form.grupo.trim() || null,
+      ordem: Number(form.ordem) || 0,
+      etapa_pai_id: form.etapa_pai_id || null,
+      ...(form.id ? {} : { valor_previsto: parseMoeda(form.valor_previsto) }),
+    }
+
+    const { error } = form.id
+      ? await supabase.from('etapas').update(payload).eq('id', form.id)
+      : await supabase.from('etapas').insert(payload)
+
     setSalvando(false)
     if (error) return setErro(error.message)
-    setNova({ nome: '', grupo: '', valor_previsto: '', ordem: '' })
+    setForm(FORM_VAZIO)
     setModal(false)
     carregar()
   }
 
-  async function excluirEtapa(e: EtapaResumo) {
-    if (e.realizado > 0) {
-      setErro(
-        `A etapa "${e.nome}" tem ${brl(e.realizado)} em lançamentos. Mova os lançamentos antes de excluí-la.`
+  async function excluirEtapa(n: NoEtapa) {
+    if (n.realizadoTotal > 0) {
+      return setErro(
+        `"${n.nome}" tem ${brl(n.realizadoTotal)} em lançamentos${
+          n.temFilhas ? ' (contando as subetapas)' : ''
+        }. Mova os lançamentos para outra etapa antes de excluir.`
       )
-      return
     }
-    if (!confirm(`Excluir a etapa "${e.nome}"?`)) return
-    const { error } = await supabase.from('etapas').delete().eq('id', e.id)
+    const aviso = n.temFilhas
+      ? `Excluir "${n.nome}" e as ${n.filhas.length} subetapa(s) dentro dela?`
+      : `Excluir a etapa "${n.nome}"?`
+    if (!confirm(aviso)) return
+
+    const { error } = await supabase.from('etapas').delete().eq('id', n.id)
     if (error) setErro(error.message)
     else carregar()
   }
 
-  const totPrevisto = etapas.reduce((s, e) => s + Number(e.valor_previsto), 0)
-  const totRealizado = etapas.reduce((s, e) => s + Number(e.realizado), 0)
-  const totAPagar = etapas.reduce((s, e) => s + Number(e.a_pagar), 0)
-  const avancoFisico =
-    totPrevisto > 0
-      ? etapas.reduce((s, e) => s + Number(e.perc_avanco) * Number(e.valor_previsto), 0) / totPrevisto
-      : 0
-
+  // ---------- relatorios ----------
   const colunas = ['Etapa', 'Grupo', 'Previsto', 'Realizado', 'Saldo', '% Fin.', '% Avanço']
-  const linhas = etapas.map((e) => [
-    e.nome,
-    e.grupo || '—',
-    brl(e.valor_previsto),
-    brl(e.realizado),
-    brl(e.saldo),
-    e.perc_financeiro != null ? pct(e.perc_financeiro) : '—',
-    pct(e.perc_avanco),
+  const linhas = linhasArvore.map((n) => [
+    `${'    '.repeat(n.nivel)}${n.nivel > 0 ? '› ' : ''}${n.nome}`,
+    n.grupo || '—',
+    brl(n.previstoTotal),
+    brl(n.realizadoTotal),
+    brl(n.previstoTotal - n.realizadoTotal),
+    n.previstoTotal > 0 ? pct((n.realizadoTotal / n.previstoTotal) * 100) : '—',
+    pct(n.avancoTotal),
   ])
 
   function gerarPDF() {
@@ -105,10 +156,10 @@ export default function OrcamentoPage() {
       colunas,
       linhas,
       resumo: [
-        { rotulo: 'Previsto', valor: brl(totPrevisto) },
-        { rotulo: 'Realizado', valor: brl(totRealizado) },
-        { rotulo: 'Saldo', valor: brl(totPrevisto - totRealizado) },
-        { rotulo: 'Avanço físico', valor: pct(avancoFisico) },
+        { rotulo: 'Previsto', valor: brl(totais.previsto) },
+        { rotulo: 'Realizado', valor: brl(totais.realizado) },
+        { rotulo: 'Saldo', valor: brl(totais.previsto - totais.realizado) },
+        { rotulo: 'Avanço físico', valor: pct(totais.avanco) },
       ],
       alinharDireita: [2, 3, 4, 5, 6],
       paisagem: true,
@@ -124,38 +175,40 @@ export default function OrcamentoPage() {
     <>
       <TituloSecao
         titulo="Orçamento e Etapas"
-        descricao="A linha-base do previsto. Edite o valor e o % de avanço direto na tabela."
+        descricao="A linha-base do previsto. Uma etapa pode ter subetapas — a mãe soma as filhas sozinha."
       >
         <BotoesRelatorio onPDF={gerarPDF} onXLSX={gerarXLSX} />
-        <BotaoNovo onClick={() => setModal(true)}>Nova etapa</BotaoNovo>
+        <BotaoNovo onClick={() => abrirNova()}>Nova etapa</BotaoNovo>
       </TituloSecao>
 
       <AvisoConfig />
       <Erro mensagem={erro} />
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat rotulo="Previsto" valor={brl(totPrevisto)} tom="destaque" />
-        <Stat rotulo="Realizado" valor={brl(totRealizado)} />
+        <Stat rotulo="Previsto" valor={brl(totais.previsto)} tom="destaque" />
+        <Stat rotulo="Realizado" valor={brl(totais.realizado)} />
         <Stat
           rotulo="Saldo do orçamento"
-          valor={brl(totPrevisto - totRealizado)}
-          tom={totPrevisto - totRealizado < 0 ? 'negativo' : 'positivo'}
-          detalhe={totAPagar > 0 ? `${brl(totAPagar)} ainda a pagar` : undefined}
+          valor={brl(totais.previsto - totais.realizado)}
+          tom={totais.previsto - totais.realizado < 0 ? 'negativo' : 'positivo'}
+          detalhe={totais.aPagar > 0 ? `${brl(totais.aPagar)} ainda a pagar` : undefined}
         />
         <Stat
           rotulo="Avanço físico"
-          valor={pct(avancoFisico)}
-          detalhe={`Financeiro: ${totPrevisto > 0 ? pct((totRealizado / totPrevisto) * 100) : '—'}`}
+          valor={pct(totais.avanco)}
+          detalhe={`Financeiro: ${
+            totais.previsto > 0 ? pct((totais.realizado / totais.previsto) * 100) : '—'
+          }`}
         />
       </div>
 
       {carregando ? (
         <Carregando />
-      ) : etapas.length === 0 ? (
+      ) : linhasArvore.length === 0 ? (
         <Vazio texto="Nenhuma etapa ainda. Rode o schema.sql no Supabase ou crie a primeira etapa." />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Etapa</th>
@@ -168,142 +221,247 @@ export default function OrcamentoPage() {
               </tr>
             </thead>
             <tbody>
-              {etapas.map((e) => {
-                const estourou = Number(e.realizado) > Number(e.valor_previsto) && Number(e.valor_previsto) > 0
+              {linhasArvore.map((n) => {
+                const estourou = n.realizadoTotal > n.previstoTotal && n.previstoTotal > 0
+                const filha = n.nivel > 0
                 return (
-                  <tr key={e.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                    <td className="px-4 py-2.5">
-                      <p className="font-medium text-gray-900">{e.nome}</p>
-                      {e.grupo && <p className="text-xs text-gray-500">{e.grupo}</p>}
-                    </td>
-
-                    <td className="px-4 py-2.5 text-right">
-                      <input
-                        type="text"
-                        defaultValue={num(e.valor_previsto)}
-                        className={`${inputCls} tnum w-32 text-right`}
-                        onBlur={(ev) => {
-                          const v = parseMoeda(ev.target.value)
-                          if (v !== Number(e.valor_previsto)) salvarCampo(e.id, 'valor_previsto', v)
-                        }}
-                      />
-                    </td>
-
-                    <td className="tnum px-4 py-2.5 text-right">
-                      {brl(e.realizado)}
-                      {Number(e.a_pagar) > 0 && (
-                        <span className="block text-[11px] text-amber-700">
-                          {brl(e.a_pagar)} a pagar
-                        </span>
-                      )}
-                    </td>
-
-                    <td
-                      className={`tnum px-4 py-2.5 text-right ${
-                        estourou ? 'font-semibold text-red-600' : 'text-gray-700'
+                  <Fragment key={n.id}>
+                    <tr
+                      className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 ${
+                        filha ? 'bg-gray-50/40' : ''
                       }`}
                     >
-                      {brl(e.saldo)}
-                    </td>
+                      <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + n.nivel * 24}px` }}>
+                        <span className="flex items-start gap-1.5">
+                          {filha && (
+                            <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+                          )}
+                          <span>
+                            <span
+                              className={`block ${
+                                filha ? 'text-gray-800' : 'font-semibold text-gray-900'
+                              }`}
+                            >
+                              {n.nome}
+                            </span>
+                            {n.grupo && <span className="block text-xs text-gray-500">{n.grupo}</span>}
+                            {n.temFilhas && (
+                              <span className="block text-[11px] text-gray-400">
+                                {n.filhas.length} subetapa(s)
+                              </span>
+                            )}
+                          </span>
+                        </span>
+                      </td>
 
-                    <td className="px-4 py-2.5">
-                      <Barra
-                        valor={Number(e.realizado)}
-                        max={Number(e.valor_previsto) || Number(e.realizado)}
-                        cor={estourou ? '#dc2626' : '#1f3a5f'}
-                      />
-                      <span className="tnum mt-1 block text-[11px] text-gray-500">
-                        {e.perc_financeiro != null ? pct(e.perc_financeiro) : 'sem previsto'}
-                      </span>
-                    </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {n.temFilhas ? (
+                          <span className="tnum block text-gray-700">
+                            {brl(n.previstoTotal)}
+                            <span className="block text-[10px] font-normal text-gray-400">
+                              soma das subetapas
+                            </span>
+                          </span>
+                        ) : (
+                          <input
+                            type="text"
+                            defaultValue={num(n.valor_previsto)}
+                            className={`${inputCls} tnum w-32 text-right`}
+                            onBlur={(ev) => {
+                              const v = parseMoeda(ev.target.value)
+                              if (v !== Number(n.valor_previsto)) salvarCampo(n.id, 'valor_previsto', v)
+                            }}
+                          />
+                        )}
+                      </td>
 
-                    <td className="px-4 py-2.5 text-center">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={5}
-                        defaultValue={Number(e.perc_avanco)}
-                        className={`${inputCls} tnum w-20 text-center`}
-                        onBlur={(ev) => {
-                          const v = Math.max(0, Math.min(100, Number(ev.target.value) || 0))
-                          if (v !== Number(e.perc_avanco)) salvarCampo(e.id, 'perc_avanco', v)
-                        }}
-                      />
-                    </td>
+                      <td className="tnum px-4 py-2.5 text-right">
+                        {brl(n.realizadoTotal)}
+                        {n.aPagarTotal > 0 && (
+                          <span className="block text-[11px] text-amber-700">
+                            {brl(n.aPagarTotal)} a pagar
+                          </span>
+                        )}
+                      </td>
 
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => excluirEtapa(e)}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                        title="Excluir etapa"
+                      <td
+                        className={`tnum px-4 py-2.5 text-right ${
+                          estourou ? 'font-semibold text-red-600' : 'text-gray-700'
+                        }`}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                        {brl(n.previstoTotal - n.realizadoTotal)}
+                      </td>
+
+                      <td className="px-4 py-2.5">
+                        <Barra
+                          valor={n.realizadoTotal}
+                          max={n.previstoTotal || n.realizadoTotal}
+                          cor={estourou ? '#dc2626' : '#1f3a5f'}
+                        />
+                        <span className="tnum mt-1 block text-[11px] text-gray-500">
+                          {n.previstoTotal > 0
+                            ? pct((n.realizadoTotal / n.previstoTotal) * 100)
+                            : 'sem previsto'}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-2.5 text-center">
+                        {n.temFilhas ? (
+                          <span className="tnum block text-gray-700">
+                            {pct(n.avancoTotal)}
+                            <span className="block text-[10px] text-gray-400">média das filhas</span>
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={5}
+                            defaultValue={Number(n.perc_avanco)}
+                            className={`${inputCls} tnum w-20 text-center`}
+                            onBlur={(ev) => {
+                              const v = Math.max(0, Math.min(100, Number(ev.target.value) || 0))
+                              if (v !== Number(n.perc_avanco)) salvarCampo(n.id, 'perc_avanco', v)
+                            }}
+                          />
+                        )}
+                      </td>
+
+                      <td className="px-4 py-2.5">
+                        <div className="flex justify-end gap-0.5">
+                          {!filha && (
+                            <button
+                              onClick={() => abrirNova(n.id)}
+                              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                              title="Adicionar subetapa"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => abrirEdicao(n)}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                            title="Editar etapa"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => excluirEtapa(n)}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            title="Excluir etapa"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
                 )
               })}
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 font-semibold">
                 <td className="px-4 py-3">Total</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totPrevisto)}</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totRealizado)}</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totPrevisto - totRealizado)}</td>
+                <td className="tnum px-4 py-3 text-right">{brl(totais.previsto)}</td>
+                <td className="tnum px-4 py-3 text-right">{brl(totais.realizado)}</td>
+                <td className="tnum px-4 py-3 text-right">{brl(totais.previsto - totais.realizado)}</td>
                 <td className="px-4 py-3 text-xs font-normal text-gray-500">
-                  {totPrevisto > 0 ? `${pct((totRealizado / totPrevisto) * 100)} do orçamento` : '—'}
+                  {totais.previsto > 0
+                    ? `${pct((totais.realizado / totais.previsto) * 100)} do orçamento`
+                    : '—'}
                 </td>
-                <td className="tnum px-4 py-3 text-center">{pct(avancoFisico)}</td>
+                <td className="tnum px-4 py-3 text-center">{pct(totais.avanco)}</td>
                 <td />
               </tr>
             </tfoot>
           </table>
           <p className="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-500">
-            As alterações salvam automaticamente ao sair do campo.
+            Valor e % avanço salvam sozinhos ao sair do campo. Use o <strong>+</strong> para criar
+            uma subetapa e o lápis para renomear ou reordenar.
           </p>
         </Card>
       )}
 
-      <Modal aberto={modal} titulo="Nova etapa" onFechar={() => setModal(false)} largura="max-w-lg">
+      {/* ---------- modal ---------- */}
+      <Modal
+        aberto={modal}
+        titulo={form.id ? 'Editar etapa' : form.etapa_pai_id ? 'Nova subetapa' : 'Nova etapa'}
+        onFechar={() => setModal(false)}
+        largura="max-w-lg"
+      >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Campo label="Nome da etapa" className="sm:col-span-2">
+          <Campo label="Nome" className="sm:col-span-2">
             <input
               className={inputCls}
-              value={nova.nome}
-              onChange={(e) => setNova({ ...nova, nome: e.target.value })}
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
               placeholder="Ex.: Impermeabilização"
             />
           </Campo>
+
+          <Campo
+            label="Subetapa de"
+            className="sm:col-span-2"
+            dica="Deixe em branco para ser uma etapa principal"
+          >
+            <select
+              className={inputCls}
+              value={form.etapa_pai_id}
+              onChange={(e) => setForm({ ...form, etapa_pai_id: e.target.value })}
+            >
+              <option value="">Nenhuma — etapa principal</option>
+              {raizes
+                .filter((r) => r.id !== form.id)
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nome}
+                  </option>
+                ))}
+            </select>
+          </Campo>
+
           <Campo label="Grupo (opcional)">
             <input
               className={inputCls}
-              value={nova.grupo}
-              onChange={(e) => setNova({ ...nova, grupo: e.target.value })}
+              value={form.grupo}
+              onChange={(e) => setForm({ ...form, grupo: e.target.value })}
               placeholder="Ex.: Acabamento"
             />
           </Campo>
-          <Campo label="Valor previsto (R$)">
-            <input
-              className={`${inputCls} tnum`}
-              value={nova.valor_previsto}
-              onChange={(e) => setNova({ ...nova, valor_previsto: e.target.value })}
-              placeholder="0,00"
-            />
-          </Campo>
+
+          {!form.id && (
+            <Campo label="Valor previsto (R$)">
+              <input
+                className={`${inputCls} tnum`}
+                value={form.valor_previsto}
+                onChange={(e) => setForm({ ...form, valor_previsto: e.target.value })}
+                placeholder="0,00"
+              />
+            </Campo>
+          )}
+
           <Campo label="Ordem" dica="Define a posição na lista">
             <input
               type="number"
               className={`${inputCls} tnum`}
-              value={nova.ordem}
-              onChange={(e) => setNova({ ...nova, ordem: e.target.value })}
-              placeholder={`${(etapas.length + 1) * 10}`}
+              value={form.ordem}
+              onChange={(e) => setForm({ ...form, ordem: e.target.value })}
             />
           </Campo>
         </div>
-        <div className="mt-5 flex justify-end">
-          <button onClick={criarEtapa} disabled={salvando || !nova.nome.trim()} className={btnPrimarioCls}>
-            <Save className="h-4 w-4" /> {salvando ? 'Salvando...' : 'Salvar etapa'}
+
+        {form.id && (
+          <p className="mt-3 text-[11px] text-gray-500">
+            O valor previsto e o % de avanço são editados direto na tabela.
+          </p>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button className={btnCls} onClick={() => setModal(false)}>
+            Cancelar
+          </button>
+          <button onClick={salvarEtapa} disabled={salvando || !form.nome.trim()} className={btnPrimarioCls}>
+            <Save className="h-4 w-4" /> {salvando ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </Modal>

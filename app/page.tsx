@@ -13,6 +13,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { brl, dataBR, mesBR, num, pct, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
+import { achatar, montarArvore, totaisGerais } from '@/lib/etapas'
 import type {
   CaixaResumo,
   CasasResumo,
@@ -82,30 +83,29 @@ export default function DashboardPage() {
     carregar()
   }, [carregar])
 
-  const previsto = etapas.reduce((s, e) => s + Number(e.valor_previsto), 0)
-  const realizado = etapas.reduce((s, e) => s + Number(e.realizado), 0)
+  const arvore = montarArvore(etapas)
+  const totais = totaisGerais(arvore)
+  const previsto = totais.previsto
+  const realizado = totais.realizado
   const aPagar = Number(caixa?.total_a_pagar || 0)
   const saldo = Number(caixa?.saldo || 0)
-  const avancoFisico =
-    previsto > 0
-      ? etapas.reduce((s, e) => s + Number(e.perc_avanco) * Number(e.valor_previsto), 0) / previsto
-      : 0
+  const avancoFisico = totais.avanco
   const avancoFinanceiro = previsto > 0 ? (realizado / previsto) * 100 : 0
-  const estouradas = etapas.filter(
-    (e) => Number(e.valor_previsto) > 0 && Number(e.realizado) > Number(e.valor_previsto)
+  const estouradas = achatar(arvore).filter(
+    (n) => n.previstoTotal > 0 && n.realizadoTotal > n.previstoTotal
   )
   const maxMes = Math.max(1, ...meses.map((m) => Number(m.total)))
-  const comPrevisto = etapas.filter((e) => Number(e.valor_previsto) > 0 || Number(e.realizado) > 0)
+  const comPrevisto = arvore.filter((n) => n.previstoTotal > 0 || n.realizadoTotal > 0)
 
   // ---------- relatorio executivo ----------
   const colunas = ['Etapa', 'Previsto', 'Realizado', 'Saldo', '% Financeiro', '% Avanço']
-  const linhas = etapas.map((e) => [
-    e.nome,
-    brl(e.valor_previsto),
-    brl(e.realizado),
-    brl(e.saldo),
-    e.perc_financeiro != null ? pct(e.perc_financeiro) : '—',
-    pct(e.perc_avanco),
+  const linhas = achatar(arvore).map((n) => [
+    `${'    '.repeat(n.nivel)}${n.nivel > 0 ? '\u203a ' : ''}${n.nome}`,
+    brl(n.previstoTotal),
+    brl(n.realizadoTotal),
+    brl(n.previstoTotal - n.realizadoTotal),
+    n.previstoTotal > 0 ? pct((n.realizadoTotal / n.previstoTotal) * 100) : '—',
+    pct(n.avancoTotal),
   ])
 
   function gerarPDF() {
@@ -328,16 +328,19 @@ export default function DashboardPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {comPrevisto.map((e) => {
-              const prev = Number(e.valor_previsto)
-              const real = Number(e.realizado)
+            {comPrevisto.map((n) => {
+              const prev = n.previstoTotal
+              const real = n.realizadoTotal
               const estourou = prev > 0 && real > prev
               return (
-                <div key={e.id}>
+                <div key={n.id}>
                   <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className="font-medium text-gray-800">
-                      {e.nome}
-                      <span className="ml-2 text-gray-400">{pct(e.perc_avanco)} executado</span>
+                      {n.nome}
+                      <span className="ml-2 text-gray-400">
+                        {pct(n.avancoTotal)} executado
+                        {n.temFilhas ? ` · ${n.filhas.length} subetapa(s)` : ''}
+                      </span>
                     </span>
                     <span className="tnum text-gray-600">
                       {brl(real)} <span className="text-gray-400">de {brl(prev)}</span>

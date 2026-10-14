@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Loader2, X } from 'lucide-react'
 import { supabase, enviarArquivo } from '@/lib/supabase'
 import { lerNFe } from '@/lib/nfe'
+import { comDescendentes, nomeCompleto } from '@/lib/etapas'
 import { brl, dataBR, hoje, num, parseMoeda, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { Casa, Etapa, Lancamento, StatusLancamento, TipoLancamento } from '@/lib/types'
@@ -108,12 +109,24 @@ export default function LancamentosPage() {
     carregar()
   }, [carregar])
 
+  // lista de etapas para os selects, com as subetapas indentadas
+  const opcoesEtapas = useMemo(() => {
+    const raizes = etapas.filter((e) => !e.etapa_pai_id)
+    return raizes.flatMap((r) => [
+      { id: r.id, rotulo: r.nome },
+      ...etapas
+        .filter((f) => f.etapa_pai_id === r.id)
+        .map((f) => ({ id: f.id, rotulo: `\u00a0\u00a0\u00a0\u203a ${f.nome}` })),
+    ])
+  }, [etapas])
+
   // ---------- filtros ----------
   const filtrados = useMemo(() => {
     const b = filtros.busca.trim().toLowerCase()
+    const idsEtapa = filtros.etapa_id ? comDescendentes(etapas, filtros.etapa_id) : null
     return lancamentos.filter((l) => {
       if (filtros.tipo && l.tipo !== filtros.tipo) return false
-      if (filtros.etapa_id && l.etapa_id !== filtros.etapa_id) return false
+      if (idsEtapa && (!l.etapa_id || !idsEtapa.includes(l.etapa_id))) return false
       if (filtros.casa && l.casa !== filtros.casa) return false
       if (filtros.status && l.status !== filtros.status) return false
       if (filtros.de && l.data_emissao < filtros.de) return false
@@ -133,7 +146,7 @@ export default function LancamentosPage() {
       }
       return true
     })
-  }, [lancamentos, filtros])
+  }, [lancamentos, filtros, etapas])
 
   const total = filtrados.reduce((s, l) => s + Number(l.valor), 0)
   const pago = filtrados.filter((l) => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0)
@@ -331,7 +344,7 @@ export default function LancamentosPage() {
   const linhas = filtrados.map((l) => [
     dataBR(l.data_emissao),
     LABEL_TIPO[l.tipo],
-    l.etapas?.nome || '—',
+    nomeCompleto(etapas, l.etapa_id) || '—',
     LABEL_CASA[l.casa],
     l.fornecedor || '—',
     l.nf_numero || '—',
@@ -428,8 +441,8 @@ export default function LancamentosPage() {
           <Campo label="Etapa">
             <select className={inputCls} value={filtros.etapa_id} onChange={(e) => setFiltros({ ...filtros, etapa_id: e.target.value })}>
               <option value="">Todas</option>
-              {etapas.map((e) => (
-                <option key={e.id} value={e.id}>{e.nome}</option>
+              {opcoesEtapas.map((e) => (
+                <option key={e.id} value={e.id}>{e.rotulo}</option>
               ))}
             </select>
           </Campo>
@@ -491,7 +504,9 @@ export default function LancamentosPage() {
                     <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">{dataBR(l.data_emissao)}</td>
                     <td className="px-4 py-2.5">
                       <p className="font-medium text-gray-900">{LABEL_TIPO[l.tipo]}</p>
-                      <p className="text-xs text-gray-500">{l.etapas?.nome || 'sem etapa'}</p>
+                      <p className="text-xs text-gray-500">
+                        {nomeCompleto(etapas, l.etapa_id) || 'sem etapa'}
+                      </p>
                     </td>
                     <td className="px-4 py-2.5">
                       <p className="font-medium text-gray-900">{l.fornecedor || '—'}</p>
@@ -655,8 +670,8 @@ export default function LancamentosPage() {
           <Campo label="Etapa">
             <select className={inputCls} value={form.etapa_id} onChange={(e) => setForm({ ...form, etapa_id: e.target.value })}>
               <option value="">Sem etapa</option>
-              {etapas.map((e) => (
-                <option key={e.id} value={e.id}>{e.nome}</option>
+              {opcoesEtapas.map((e) => (
+                <option key={e.id} value={e.id}>{e.rotulo}</option>
               ))}
             </select>
           </Campo>

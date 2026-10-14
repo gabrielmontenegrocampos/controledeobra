@@ -31,6 +31,12 @@ create table if not exists etapas (
   created_at     timestamptz default now()
 );
 
+-- subetapas: uma etapa pode ser filha de outra (apagar a mae apaga as filhas)
+alter table etapas
+  add column if not exists etapa_pai_id uuid references etapas(id) on delete cascade;
+
+create index if not exists idx_etapas_pai on etapas(etapa_pai_id);
+
 -- Investidores
 create table if not exists investidores (
   id         uuid primary key default gen_random_uuid(),
@@ -161,7 +167,8 @@ select
   e.valor_previsto - coalesce(l.realizado, 0) as saldo,
   case when e.valor_previsto > 0
        then round(coalesce(l.realizado, 0) / e.valor_previsto * 100, 2)
-       else null end as perc_financeiro
+       else null end as perc_financeiro,
+  e.etapa_pai_id
 from etapas e
 left join (
   select etapa_id,
