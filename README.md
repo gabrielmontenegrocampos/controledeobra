@@ -11,7 +11,7 @@ previsto × realizado, diário de obra, notas fiscais com comprovante e caixa do
 |---|---|
 | **Dashboard** (`/`) | Previsto × realizado, avanço físico × financeiro, custo por casa, gasto mensal, alertas |
 | **Orçamento** (`/orcamento`) | Etapas da obra: valor previsto e % de avanço (edição direto na tabela) |
-| **Lançamentos** (`/lancamentos`) | NF de material, mão de obra, serviços e taxas — com itens da nota, NF e comprovante anexados |
+| **Lançamentos** (`/lancamentos`) | NF de material, mão de obra, serviços e taxas — com itens da nota, NF e comprovante anexados. Importa o **XML da NF-e** e preenche tudo sozinho |
 | **Materiais** (`/materiais`) | Consolidado por material: quantidade comprada, preço médio e histórico de compras |
 | **Caixa** (`/caixa`) | Aportes de cada investidor, participação, saldo e extrato de entradas e saídas |
 | **Diário** (`/diario`) | Registro diário: clima, atividades, equipe, ocorrências e fotos |

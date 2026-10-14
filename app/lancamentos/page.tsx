@@ -1,8 +1,9 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { Pencil, Trash2, Save, Plus, Paperclip, FileText, X } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Loader2, X } from 'lucide-react'
+import { supabase, enviarArquivo } from '@/lib/supabase'
+import { lerNFe } from '@/lib/nfe'
 import { brl, dataBR, hoje, num, parseMoeda, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { Casa, Etapa, Lancamento, StatusLancamento, TipoLancamento } from '@/lib/types'
@@ -38,6 +39,7 @@ type Form = {
   data_emissao: string
   data_pagamento: string
   valor: string
+  valorAuto: boolean
   status: StatusLancamento
   forma_pagamento: string
   nf_url: string | null
@@ -55,6 +57,7 @@ const FORM_VAZIO: Form = {
   data_emissao: hoje(),
   data_pagamento: hoje(),
   valor: '',
+  valorAuto: true,
   status: 'pago',
   forma_pagamento: 'Pix',
   nf_url: null,
@@ -73,6 +76,8 @@ export default function LancamentosPage() {
   const [salvando, setSalvando] = useState(false)
   const [form, setForm] = useState<Form>(FORM_VAZIO)
   const [expandido, setExpandido] = useState<string | null>(null)
+  const [importando, setImportando] = useState(false)
+  const [avisoXML, setAvisoXML] = useState<{ tom: 'ok' | 'alerta' | 'erro'; texto: string } | null>(null)
 
   const [filtros, setFiltros] = useState({
     tipo: '',
@@ -143,12 +148,15 @@ export default function LancamentosPage() {
 
   function abrirNovo() {
     setForm({ ...FORM_VAZIO, etapa_id: etapas[0]?.id || '' })
+    setAvisoXML(null)
     setModal(true)
   }
 
   function abrirEdicao(l: Lancamento) {
+    setAvisoXML(null)
     setForm({
       id: l.id,
+      valorAuto: false,
       tipo: l.tipo,
       etapa_id: l.etapa_id || '',
       casa: l.casa,
@@ -172,8 +180,81 @@ export default function LancamentosPage() {
     setModal(true)
   }
 
+  async function importarXML(ev: React.ChangeEvent<HTMLInputElement>) {
+    const file = ev.target.files?.[0]
+    if (!file) return
+
+    setImportando(true)
+    setAvisoXML(null)
+    setErro(null)
+
+    try {
+      const nota = lerNFe(await file.text())
+
+      const duplicada = lancamentos.find(
+        (l) =>
+          l.id !== form.id &&
+          l.nf_numero &&
+          nota.nf_numero &&
+          l.nf_numero === nota.nf_numero &&
+          (l.fornecedor || '').toLowerCase() === nota.fornecedor.toLowerCase()
+      )
+
+      // guarda o proprio XML como anexo da nota
+      let nfUrl = form.nf_url
+      try {
+        nfUrl = await enviarArquivo(file, 'notas-xml')
+      } catch {
+        // se o upload falhar, segue mesmo assim com os dados preenchidos
+      }
+
+      setForm((f) => ({
+        ...f,
+        tipo: 'material',
+        fornecedor: nota.fornecedor || f.fornecedor,
+        nf_numero: nota.nf_numero || f.nf_numero,
+        data_emissao: nota.data_emissao || f.data_emissao,
+        valor: num(nota.valor_total),
+        valorAuto: false,
+        nf_url: nfUrl,
+        itens: nota.itens.map((i) => ({
+          material: i.material,
+          unidade: i.unidade,
+          quantidade: String(i.quantidade),
+          valor_unit: num(i.valor_unit, 4),
+        })),
+      }))
+
+      const diferenca = Math.abs(nota.valor_total - nota.valor_itens)
+      const partes = [
+        `${nota.itens.length} item(ns) importado(s)${nota.fornecedor ? ` de ${nota.fornecedor}` : ''}.`,
+      ]
+      if (diferenca >= 0.01) {
+        partes.push(
+          `Total da nota ${brl(nota.valor_total)} contra ${brl(nota.valor_itens)} somando os itens — diferença de ${brl(diferenca)} (frete, impostos ou desconto). Deixei o total da nota.`
+        )
+      }
+      if (duplicada) {
+        partes.push(`Atenção: já existe um lançamento com a NF ${nota.nf_numero} desse fornecedor.`)
+      }
+
+      setAvisoXML({
+        tom: duplicada || diferenca >= 0.01 ? 'alerta' : 'ok',
+        texto: partes.join(' '),
+      })
+    } catch (e) {
+      setAvisoXML({
+        tom: 'erro',
+        texto: e instanceof Error ? e.message : 'Não consegui ler o XML.',
+      })
+    } finally {
+      setImportando(false)
+      ev.target.value = ''
+    }
+  }
+
   async function salvar() {
-    const valorFinal = form.itens.length > 0 ? totalItens : parseMoeda(form.valor)
+    const valorFinal = form.valorAuto && form.itens.length > 0 ? totalItens : parseMoeda(form.valor)
     if (valorFinal <= 0) return setErro('Informe um valor maior que zero (ou adicione itens).')
     if (!form.data_emissao) return setErro('Informe a data.')
 
@@ -518,6 +599,51 @@ export default function LancamentosPage() {
         onFechar={() => setModal(false)}
         largura="max-w-3xl"
       >
+        {/* importar XML da NF-e */}
+        <div className="mb-4 rounded-lg border border-dashed border-[#1f3a5f]/40 bg-[#1f3a5f]/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="flex items-center gap-1.5 text-sm font-medium text-[#1f3a5f]">
+                <FileCode className="h-4 w-4" /> Importar XML da NF-e
+              </p>
+              <p className="text-[11px] text-gray-600">
+                Preenche fornecedor, número, data, valor e todos os itens de uma vez.
+              </p>
+            </div>
+            <label className={`${btnCls} cursor-pointer`}>
+              {importando ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Lendo...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" /> Escolher XML
+                </>
+              )}
+              <input
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                className="hidden"
+                disabled={importando}
+                onChange={importarXML}
+              />
+            </label>
+          </div>
+          {avisoXML && (
+            <p
+              className={`mt-2 text-xs ${
+                avisoXML.tom === 'erro'
+                  ? 'text-red-600'
+                  : avisoXML.tom === 'alerta'
+                    ? 'text-amber-700'
+                    : 'text-emerald-700'
+              }`}
+            >
+              {avisoXML.texto}
+            </p>
+          )}
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-3">
           <Campo label="Tipo">
             <select className={inputCls} value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value as TipoLancamento })}>
@@ -574,15 +700,40 @@ export default function LancamentosPage() {
           <Campo
             label="Valor total (R$)"
             className="sm:col-span-2"
-            dica={form.itens.length > 0 ? 'Calculado automaticamente pelos itens abaixo' : undefined}
+            dica={
+              form.itens.length > 0
+                ? form.valorAuto
+                  ? 'Somando os itens abaixo'
+                  : `Soma dos itens: ${brl(totalItens)}`
+                : undefined
+            }
           >
-            <input
-              className={`${inputCls} tnum text-right text-base font-semibold ${form.itens.length > 0 ? 'bg-gray-100' : ''}`}
-              value={form.itens.length > 0 ? num(totalItens) : form.valor}
-              readOnly={form.itens.length > 0}
-              onChange={(e) => setForm({ ...form, valor: e.target.value })}
-              placeholder="0,00"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                className={`${inputCls} tnum text-right text-base font-semibold ${
+                  form.valorAuto && form.itens.length > 0 ? 'bg-gray-100' : ''
+                }`}
+                value={form.valorAuto && form.itens.length > 0 ? num(totalItens) : form.valor}
+                readOnly={form.valorAuto && form.itens.length > 0}
+                onChange={(e) => setForm({ ...form, valor: e.target.value })}
+                placeholder="0,00"
+              />
+              {form.itens.length > 0 && (
+                <button
+                  type="button"
+                  className="shrink-0 whitespace-nowrap text-[11px] font-medium text-[#1f3a5f] underline"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      valorAuto: !form.valorAuto,
+                      valor: form.valorAuto ? num(totalItens) : form.valor,
+                    })
+                  }
+                >
+                  {form.valorAuto ? 'editar' : 'usar soma'}
+                </button>
+              )}
+            </div>
           </Campo>
         </div>
 
