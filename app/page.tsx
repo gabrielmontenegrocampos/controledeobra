@@ -44,13 +44,14 @@ export default function DashboardPage() {
   const [meses, setMeses] = useState<GastoMensal[]>([])
   const [ultimos, setUltimos] = useState<Lancamento[]>([])
   const [aVencer, setAVencer] = useState<Lancamento[]>([])
+  const [semEtapa, setSemEtapa] = useState({ total: 0, quantidade: 0 })
   const [semComprovante, setSemComprovante] = useState(0)
   const [ultimoDiario, setUltimoDiario] = useState<Registro | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
-    const [o, e, c, ca, m, u, sc, d, av] = await Promise.all([
+    const [o, e, c, ca, m, u, sc, d, av, se] = await Promise.all([
       supabase.from('obra').select('*').limit(1).maybeSingle(),
       supabase.from('v_etapas_resumo').select('*').order('ordem'),
       supabase.from('v_caixa_resumo').select('*').maybeSingle(),
@@ -73,6 +74,7 @@ export default function DashboardPage() {
         .eq('status', 'a_pagar')
         .order('data_vencimento', { ascending: true })
         .limit(5),
+      supabase.from('lancamentos').select('valor').is('etapa_id', null),
     ])
 
     if (e.error) setErro(mensagemErro(e.error))
@@ -85,6 +87,11 @@ export default function DashboardPage() {
     setSemComprovante(sc.count || 0)
     if (d.data && d.data.length) setUltimoDiario(d.data[0] as Registro)
     if (av.data) setAVencer(av.data as Lancamento[])
+    if (se.data)
+      setSemEtapa({
+        total: se.data.reduce((soma, l) => soma + Number(l.valor), 0),
+        quantidade: se.data.length,
+      })
     setCarregando(false)
   }, [])
 
@@ -95,7 +102,9 @@ export default function DashboardPage() {
   const arvore = montarArvore(etapas)
   const totais = totaisGerais(arvore)
   const previsto = totais.previsto
-  const realizado = totais.realizado
+  // o realizado e tudo que saiu, inclusive o que ainda nao tem etapa
+  const realizadoEtapas = totais.realizado
+  const realizado = realizadoEtapas + semEtapa.total
   const aPagar = Number(caixa?.total_a_pagar || 0)
   const saldo = Number(caixa?.saldo || 0)
   const avancoFisico = totais.avanco
@@ -196,7 +205,13 @@ export default function DashboardPage() {
         <Stat
           rotulo="Gasto realizado"
           valor={brl(realizado)}
-          detalhe={previsto > 0 ? `${pct(avancoFinanceiro)} do previsto` : 'defina o previsto no Orçamento'}
+          detalhe={
+            semEtapa.total > 0
+              ? `${brl(semEtapa.total)} ainda sem etapa`
+              : previsto > 0
+                ? `${pct(avancoFinanceiro)} do previsto`
+                : 'defina o previsto no Orçamento'
+          }
         />
         <Stat
           rotulo="Saldo em caixa"
@@ -213,7 +228,7 @@ export default function DashboardPage() {
       </div>
 
       {/* alertas */}
-      {(estouradas.length > 0 || semComprovante > 0 || saldo < 0) && (
+      {(estouradas.length > 0 || semComprovante > 0 || saldo < 0 || semEtapa.quantidade > 0) && (
         <Card className="mt-4 border-amber-200 bg-amber-50">
           <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900">
             <AlertTriangle className="h-4 w-4" /> Pontos de atenção
@@ -225,6 +240,15 @@ export default function DashboardPage() {
                 • {estouradas.length} etapa(s) acima do previsto:{' '}
                 {estouradas.slice(0, 3).map((e) => e.nome).join(', ')}
                 {estouradas.length > 3 ? '...' : ''}
+              </li>
+            )}
+            {semEtapa.quantidade > 0 && (
+              <li>
+                • {semEtapa.quantidade} lançamento(s) sem etapa, somando {brl(semEtapa.total)} — eles
+                entram no gasto total, mas ficam de fora da comparação por etapa.{' '}
+                <Link href="/lancamentos" className="underline">
+                  classificar
+                </Link>
               </li>
             )}
             {semComprovante > 0 && (
@@ -383,6 +407,19 @@ export default function DashboardPage() {
           </p>
         ) : (
           <div className="space-y-3">
+            {semEtapa.total > 0 && (
+              <div className="rounded-lg bg-amber-50 px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-medium text-amber-900">
+                    Sem etapa
+                    <span className="ml-2 font-normal text-amber-700">
+                      {semEtapa.quantidade} lançamento(s)
+                    </span>
+                  </span>
+                  <span className="tnum font-semibold text-amber-900">{brl(semEtapa.total)}</span>
+                </div>
+              </div>
+            )}
             {comPrevisto.map((n) => {
               const prev = n.previstoTotal
               const real = n.realizadoTotal

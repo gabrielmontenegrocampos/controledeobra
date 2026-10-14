@@ -186,9 +186,13 @@ export default function LancamentosPage() {
   // ---------- filtros ----------
   const filtrados = useMemo(() => {
     const b = filtros.busca.trim().toLowerCase()
-    const idsEtapa = filtros.etapa_id ? comDescendentes(etapas, filtros.etapa_id) : null
+    const idsEtapa =
+      filtros.etapa_id && filtros.etapa_id !== 'sem_etapa'
+        ? comDescendentes(etapas, filtros.etapa_id)
+        : null
     return lancamentos.filter((l) => {
       if (filtros.tipo && l.tipo !== filtros.tipo) return false
+      if (filtros.etapa_id === 'sem_etapa' && l.etapa_id) return false
       if (idsEtapa && (!l.etapa_id || !idsEtapa.includes(l.etapa_id))) return false
       if (filtros.casa && l.casa !== filtros.casa) return false
       if (filtros.status && l.status !== filtros.status) return false
@@ -724,6 +728,7 @@ export default function LancamentosPage() {
           <Campo label="Etapa">
             <select className={inputCls} value={filtros.etapa_id} onChange={(e) => setFiltros({ ...filtros, etapa_id: e.target.value })}>
               <option value="">Todas</option>
+              <option value="sem_etapa">— Sem etapa —</option>
               {opcoesEtapas.map((e) => (
                 <option key={e.id} value={e.id}>{e.rotulo}</option>
               ))}

@@ -50,11 +50,20 @@ export default function OrcamentoPage() {
   const [modal, setModal] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [form, setForm] = useState<FormEtapa>(FORM_VAZIO)
+  const [semEtapa, setSemEtapa] = useState({ total: 0, quantidade: 0 })
 
   const carregar = useCallback(async () => {
-    const { data, error } = await supabase.from('v_etapas_resumo').select('*').order('ordem')
-    if (error) setErro(mensagemErro(error))
-    else setEtapas((data as EtapaResumo[]) || [])
+    const [resumo, soltos] = await Promise.all([
+      supabase.from('v_etapas_resumo').select('*').order('ordem'),
+      supabase.from('lancamentos').select('valor').is('etapa_id', null),
+    ])
+    if (resumo.error) setErro(mensagemErro(resumo.error))
+    else setEtapas((resumo.data as EtapaResumo[]) || [])
+    if (soltos.data)
+      setSemEtapa({
+        total: soltos.data.reduce((soma, l) => soma + Number(l.valor), 0),
+        quantidade: soltos.data.length,
+      })
     setCarregando(false)
   }, [])
 
@@ -151,15 +160,20 @@ export default function OrcamentoPage() {
     pct(n.avancoTotal),
   ])
 
+  const linhasComSoltos =
+    semEtapa.total > 0
+      ? [...linhas, ['Sem etapa', '—', brl(0), brl(semEtapa.total), brl(-semEtapa.total), '—', '—']]
+      : linhas
+
   function gerarPDF() {
     exportarPDF({
       titulo: 'Orçamento — Previsto x Realizado',
       colunas,
-      linhas,
+      linhas: linhasComSoltos,
       resumo: [
         { rotulo: 'Previsto', valor: brl(totais.previsto) },
-        { rotulo: 'Realizado', valor: brl(totais.realizado) },
-        { rotulo: 'Saldo', valor: brl(totais.previsto - totais.realizado) },
+        { rotulo: 'Realizado', valor: brl(totais.realizado + semEtapa.total) },
+        { rotulo: 'Saldo', valor: brl(totais.previsto - totais.realizado - semEtapa.total) },
         { rotulo: 'Avanço físico', valor: pct(totais.avanco) },
       ],
       alinharDireita: [2, 3, 4, 5, 6],
@@ -169,7 +183,7 @@ export default function OrcamentoPage() {
   }
 
   function gerarXLSX() {
-    exportarXLSX('orcamento-lagoa-santa', [{ nome: 'Orçamento', colunas, linhas }])
+    exportarXLSX('orcamento-lagoa-santa', [{ nome: 'Orçamento', colunas, linhas: linhasComSoltos }])
   }
 
   return (
@@ -187,11 +201,15 @@ export default function OrcamentoPage() {
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat rotulo="Previsto" valor={brl(totais.previsto)} tom="destaque" />
-        <Stat rotulo="Realizado" valor={brl(totais.realizado)} />
+        <Stat
+          rotulo="Realizado"
+          valor={brl(totais.realizado + semEtapa.total)}
+          detalhe={semEtapa.total > 0 ? `${brl(semEtapa.total)} sem etapa` : undefined}
+        />
         <Stat
           rotulo="Saldo do orçamento"
-          valor={brl(totais.previsto - totais.realizado)}
-          tom={totais.previsto - totais.realizado < 0 ? 'negativo' : 'positivo'}
+          valor={brl(totais.previsto - totais.realizado - semEtapa.total)}
+          tom={totais.previsto - totais.realizado - semEtapa.total < 0 ? 'negativo' : 'positivo'}
           detalhe={totais.aPagar > 0 ? `${brl(totais.aPagar)} ainda a pagar` : undefined}
         />
         <Stat
@@ -369,15 +387,38 @@ export default function OrcamentoPage() {
                 )
               })}
             </tbody>
+            {semEtapa.total > 0 && (
+              <tbody>
+                <tr className="border-t border-amber-200 bg-amber-50">
+                  <td className="px-4 py-2.5">
+                    <span className="block font-medium text-amber-900">Sem etapa</span>
+                    <span className="block text-xs text-amber-700">
+                      {semEtapa.quantidade} lançamento(s) ainda não classificados
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs text-amber-700">—</td>
+                  <td className="tnum px-4 py-2.5 text-right font-semibold text-amber-900">
+                    {brl(semEtapa.total)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs text-amber-700">—</td>
+                  <td className="px-4 py-2.5 text-xs text-amber-700">
+                    fora da comparação por etapa
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tbody>
+            )}
             <tfoot>
               <tr className="bg-gray-50 font-semibold">
                 <td className="px-4 py-3">Total</td>
                 <td className="tnum px-4 py-3 text-right">{brl(totais.previsto)}</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totais.realizado)}</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totais.previsto - totais.realizado)}</td>
+                <td className="tnum px-4 py-3 text-right">{brl(totais.realizado + semEtapa.total)}</td>
+                <td className="tnum px-4 py-3 text-right">
+                  {brl(totais.previsto - totais.realizado - semEtapa.total)}
+                </td>
                 <td className="px-4 py-3 text-xs font-normal text-gray-500">
                   {totais.previsto > 0
-                    ? `${pct((totais.realizado / totais.previsto) * 100)} do orçamento`
+                    ? `${pct(((totais.realizado + semEtapa.total) / totais.previsto) * 100)} do orçamento`
                     : '—'}
                 </td>
                 <td className="tnum px-4 py-3 text-center">{pct(totais.avanco)}</td>
