@@ -12,6 +12,7 @@ previsto × realizado, diário de obra, notas fiscais com comprovante e caixa do
 | **Dashboard** (`/`) | Previsto × realizado, avanço físico × financeiro, custo por casa, gasto mensal, alertas |
 | **Orçamento** (`/orcamento`) | Etapas da obra: valor previsto e % de avanço (edição direto na tabela) |
 | **Lançamentos** (`/lancamentos`) | NF de material, mão de obra, serviços e taxas — com itens da nota, NF e comprovante anexados. Importa o **XML da NF-e** e preenche tudo sozinho |
+| **Fornecedores** (`/fornecedores`) | Lista que se completa sozinha a cada lançamento, com CNPJ, contato e total comprado de cada um |
 | **Materiais** (`/materiais`) | Consolidado por material: quantidade comprada, preço médio e histórico de compras |
 | **Caixa** (`/caixa`) | Quanto cada investidor colocou: contas que ele mesmo pagou + aportes em dinheiro, com participação de cada um |
 | **Diário** (`/diario`) | Registro diário: clima, atividades, equipe, ocorrências e fotos |
@@ -24,6 +25,7 @@ Toda seção exporta **PDF** e **Excel**.
 - **Lançamento** = dinheiro que sai, sempre ligado a uma etapa e a uma casa (Casa 01, Casa 02 ou Comum),
   e com o investidor que pagou aquela conta.
 - **Aporte** = dinheiro entregue ao caixa comum, sem ser para uma conta específica.
+- **Compra parcelada** = entrada + N parcelas mensais; cada parcela é um lançamento a pagar com vencimento.
 - Total investido por sócio = contas que ele pagou + aportes dele.
 - Saldo do caixa comum = aportes − contas pagas sem investidor definido.
 - Realizado por etapa = soma dos lançamentos daquela etapa.

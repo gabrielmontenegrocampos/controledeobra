@@ -59,6 +59,51 @@ export type Aporte = {
   investidores?: { nome: string } | null
 }
 
+export type Fornecedor = {
+  id: string
+  nome: string
+  cnpj: string | null
+  telefone: string | null
+  email: string | null
+  observacao: string | null
+}
+
+export type FornecedorResumo = {
+  id: string
+  nome: string
+  cnpj: string | null
+  telefone: string | null
+  email: string | null
+  qtd_lancamentos: number
+  total_comprado: number
+  total_a_pagar: number
+  ultima_compra: string | null
+}
+
+export type Parcelamento = {
+  id: string
+  descricao: string
+  fornecedor: string | null
+  fornecedor_id: string | null
+  etapa_id: string | null
+  casa: Casa
+  tipo: TipoLancamento
+  valor_total: number
+  valor_entrada: number
+  qtd_parcelas: number
+  valor_parcela: number
+  primeira_parcela: string
+  observacao: string | null
+}
+
+export type ParcelamentoResumo = Parcelamento & {
+  parcelas_geradas: number
+  parcelas_pagas: number
+  valor_pago: number
+  valor_em_aberto: number
+  proximo_vencimento: string | null
+}
+
 export type ItemLancamento = {
   id?: string
   lancamento_id?: string
@@ -84,6 +129,11 @@ export type Lancamento = {
   nf_url: string | null
   comprovante_url: string | null
   investidor_id: string | null
+  fornecedor_id: string | null
+  parcelamento_id: string | null
+  parcela_num: number | null
+  parcela_total: number | null
+  data_vencimento: string | null
   etapas?: { nome: string } | null
   itens_lancamento?: ItemLancamento[]
 }

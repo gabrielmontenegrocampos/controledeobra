@@ -1,13 +1,21 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Loader2, X } from 'lucide-react'
+import {
+  Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Loader2, X,
+  CalendarClock, Layers, ChevronDown, ChevronRight,
+} from 'lucide-react'
 import { supabase, enviarArquivo, mensagemErro } from '@/lib/supabase'
 import { lerNFe } from '@/lib/nfe'
 import { comDescendentes, nomeCompleto } from '@/lib/etapas'
+import { garantirFornecedor } from '@/lib/fornecedores'
+import { gerarParcelas, somarMeses, valorParcela } from '@/lib/parcelas'
 import { brl, dataBR, hoje, num, numEnxuto, parseMoeda, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
-import type { Casa, Etapa, Investidor, Lancamento, StatusLancamento, TipoLancamento } from '@/lib/types'
+import type {
+  Casa, Etapa, Fornecedor, Investidor, Lancamento, ParcelamentoResumo,
+  StatusLancamento, TipoLancamento,
+} from '@/lib/types'
 import { Anexo } from '@/components/anexo'
 import {
   AvisoConfig,
@@ -17,6 +25,7 @@ import {
   Campo,
   Card,
   Carregando,
+  Barra,
   Erro,
   InputDigitos,
   InputMoeda,
@@ -42,6 +51,7 @@ type Form = {
   nf_numero: string
   data_emissao: string
   data_pagamento: string
+  data_vencimento: string
   valor: string
   valorAuto: boolean
   status: StatusLancamento
@@ -61,6 +71,7 @@ const FORM_VAZIO: Form = {
   nf_numero: '',
   data_emissao: hoje(),
   data_pagamento: hoje(),
+  data_vencimento: hoje(),
   valor: '',
   valorAuto: true,
   status: 'pago',
@@ -72,6 +83,38 @@ const FORM_VAZIO: Form = {
 }
 
 const ITEM_VAZIO: ItemForm = { material: '', unidade: 'un', quantidade: '1', valor_unit: '' }
+
+type FormParcela = {
+  descricao: string
+  fornecedor: string
+  etapa_id: string
+  casa: Casa
+  tipo: TipoLancamento
+  investidor_id: string
+  valor_total: string
+  valor_entrada: string
+  entrada_paga: boolean
+  data_entrada: string
+  qtd_parcelas: string
+  primeiro_vencimento: string
+  observacao: string
+}
+
+const PARCELA_VAZIA: FormParcela = {
+  descricao: '',
+  fornecedor: '',
+  etapa_id: '',
+  casa: 'comum',
+  tipo: 'outro',
+  investidor_id: '',
+  valor_total: '',
+  valor_entrada: '',
+  entrada_paga: true,
+  data_entrada: hoje(),
+  qtd_parcelas: '12',
+  primeiro_vencimento: somarMeses(hoje(), 1),
+  observacao: '',
+}
 
 export default function LancamentosPage() {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
@@ -85,6 +128,12 @@ export default function LancamentosPage() {
   const [expandido, setExpandido] = useState<string | null>(null)
   const [importando, setImportando] = useState(false)
   const [avisoXML, setAvisoXML] = useState<{ tom: 'ok' | 'alerta' | 'erro'; texto: string } | null>(null)
+  const [cnpjXML, setCnpjXML] = useState<string | null>(null)
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [parcelamentos, setParcelamentos] = useState<ParcelamentoResumo[]>([])
+  const [mostrarParcelas, setMostrarParcelas] = useState(true)
+  const [modalParcela, setModalParcela] = useState(false)
+  const [formParcela, setFormParcela] = useState(PARCELA_VAZIA)
 
   const [filtros, setFiltros] = useState({
     tipo: '',
@@ -92,13 +141,14 @@ export default function LancamentosPage() {
     casa: '',
     status: '',
     investidor_id: '',
+    parcelamento_id: '',
     busca: '',
     de: '',
     ate: '',
   })
 
   const carregar = useCallback(async () => {
-    const [lanc, et, inv] = await Promise.all([
+    const [lanc, et, inv, forn, parc] = await Promise.all([
       supabase
         .from('lancamentos')
         .select('*, etapas(nome), itens_lancamento(*)')
@@ -106,11 +156,15 @@ export default function LancamentosPage() {
         .order('created_at', { ascending: false }),
       supabase.from('etapas').select('*').order('ordem'),
       supabase.from('investidores').select('*').order('nome'),
+      supabase.from('fornecedores').select('*').order('nome'),
+      supabase.from('v_parcelamentos_resumo').select('*').order('primeira_parcela'),
     ])
     if (lanc.error) setErro(mensagemErro(lanc.error))
     else setLancamentos((lanc.data as Lancamento[]) || [])
     if (et.data) setEtapas(et.data as Etapa[])
     if (inv.data) setInvestidores(inv.data as Investidor[])
+    if (forn.data) setFornecedores(forn.data as Fornecedor[])
+    if (parc.data) setParcelamentos(parc.data as ParcelamentoResumo[])
     setCarregando(false)
   }, [])
 
@@ -139,6 +193,7 @@ export default function LancamentosPage() {
       if (filtros.casa && l.casa !== filtros.casa) return false
       if (filtros.status && l.status !== filtros.status) return false
       if (filtros.investidor_id && l.investidor_id !== filtros.investidor_id) return false
+      if (filtros.parcelamento_id && l.parcelamento_id !== filtros.parcelamento_id) return false
       if (filtros.de && l.data_emissao < filtros.de) return false
       if (filtros.ate && l.data_emissao > filtros.ate) return false
       if (b) {
@@ -172,11 +227,13 @@ export default function LancamentosPage() {
   function abrirNovo() {
     setForm({ ...FORM_VAZIO, etapa_id: etapas[0]?.id || '' })
     setAvisoXML(null)
+    setCnpjXML(null)
     setModal(true)
   }
 
   function abrirEdicao(l: Lancamento) {
     setAvisoXML(null)
+    setCnpjXML(null)
     setForm({
       id: l.id,
       valorAuto: false,
@@ -188,6 +245,7 @@ export default function LancamentosPage() {
       nf_numero: l.nf_numero || '',
       data_emissao: l.data_emissao,
       data_pagamento: l.data_pagamento || '',
+      data_vencimento: l.data_vencimento || l.data_emissao,
       valor: num(l.valor),
       status: l.status,
       forma_pagamento: l.forma_pagamento || '',
@@ -214,6 +272,7 @@ export default function LancamentosPage() {
 
     try {
       const nota = lerNFe(await file.text())
+      setCnpjXML(nota.cnpj)
 
       const duplicada = lancamentos.find(
         (l) =>
@@ -285,8 +344,17 @@ export default function LancamentosPage() {
     setSalvando(true)
     setErro(null)
 
+    const fornecedorId = form.fornecedor.trim()
+      ? await garantirFornecedor(form.fornecedor, cnpjXML)
+      : null
+
     const payload = {
       etapa_id: form.etapa_id || null,
+      fornecedor_id: fornecedorId,
+      data_vencimento:
+        form.status === 'a_pagar'
+          ? form.data_vencimento || form.data_emissao
+          : form.data_pagamento || form.data_emissao,
       tipo: form.tipo,
       casa: form.casa,
       fornecedor: form.fornecedor.trim() || null,
@@ -342,6 +410,112 @@ export default function LancamentosPage() {
     setModal(false)
     setForm(FORM_VAZIO)
     carregar()
+  }
+
+  async function salvarParcelamento() {
+    const total = parseMoeda(formParcela.valor_total)
+    const entrada = parseMoeda(formParcela.valor_entrada)
+    const qtd = Number(formParcela.qtd_parcelas) || 0
+
+    if (!formParcela.descricao.trim()) return setErro('Descreva a compra. Ex.: Lote 12 — quadra 4.')
+    if (total <= 0) return setErro('Informe o valor total da compra.')
+    if (entrada > total) return setErro('A entrada não pode ser maior que o valor total.')
+    if (qtd < 1 || qtd > 240) return setErro('A quantidade de parcelas deve ficar entre 1 e 240.')
+
+    setSalvando(true)
+    setErro(null)
+
+    const fornecedorId = formParcela.fornecedor.trim()
+      ? await garantirFornecedor(formParcela.fornecedor)
+      : null
+
+    const parcelas = gerarParcelas({
+      valorTotal: total,
+      entrada,
+      quantidade: qtd,
+      primeiroVencimento: formParcela.primeiro_vencimento,
+    })
+
+    const { data: cabecalho, error: erroCabecalho } = await supabase
+      .from('parcelamentos')
+      .insert({
+        descricao: formParcela.descricao.trim(),
+        fornecedor: formParcela.fornecedor.trim() || null,
+        fornecedor_id: fornecedorId,
+        etapa_id: formParcela.etapa_id || null,
+        casa: formParcela.casa,
+        tipo: formParcela.tipo,
+        valor_total: total,
+        valor_entrada: entrada,
+        qtd_parcelas: qtd,
+        valor_parcela: parcelas[0]?.valor || 0,
+        primeira_parcela: formParcela.primeiro_vencimento,
+        observacao: formParcela.observacao.trim() || null,
+      })
+      .select('id')
+      .single()
+
+    if (erroCabecalho) {
+      setSalvando(false)
+      return setErro(mensagemErro(erroCabecalho))
+    }
+
+    const base = {
+      etapa_id: formParcela.etapa_id || null,
+      tipo: formParcela.tipo,
+      casa: formParcela.casa,
+      fornecedor: formParcela.fornecedor.trim() || null,
+      fornecedor_id: fornecedorId,
+      parcelamento_id: cabecalho.id,
+    }
+
+    const linhas: Record<string, unknown>[] = []
+
+    if (entrada > 0) {
+      linhas.push({
+        ...base,
+        descricao: `${formParcela.descricao.trim()} — entrada`,
+        data_emissao: formParcela.data_entrada,
+        data_vencimento: formParcela.data_entrada,
+        data_pagamento: formParcela.entrada_paga ? formParcela.data_entrada : null,
+        valor: entrada,
+        status: formParcela.entrada_paga ? 'pago' : 'a_pagar',
+        investidor_id: formParcela.investidor_id || null,
+      })
+    }
+
+    parcelas.forEach((parcela) => {
+      linhas.push({
+        ...base,
+        descricao: `${formParcela.descricao.trim()} — parcela ${parcela.numero}/${qtd}`,
+        data_emissao: parcela.vencimento,
+        data_vencimento: parcela.vencimento,
+        data_pagamento: null,
+        valor: parcela.valor,
+        status: 'a_pagar',
+        parcela_num: parcela.numero,
+        parcela_total: qtd,
+      })
+    })
+
+    const { error } = await supabase.from('lancamentos').insert(linhas)
+    setSalvando(false)
+    if (error) return setErro(mensagemErro(error))
+
+    setFormParcela(PARCELA_VAZIA)
+    setModalParcela(false)
+    carregar()
+  }
+
+  async function excluirParcelamento(p: ParcelamentoResumo) {
+    const aviso =
+      Number(p.parcelas_pagas) > 0
+        ? `"${p.descricao}" já tem ${p.parcelas_pagas} parcela(s) paga(s). Excluir apaga TODAS as parcelas e a entrada. Continuar?`
+        : `Excluir "${p.descricao}" e todas as suas parcelas?`
+    if (!confirm(aviso)) return
+    const { error } = await supabase.from('parcelamentos').delete().eq('id', p.id)
+    if (error) setErro(mensagemErro(error))
+    else carregar()
   }
 
   async function excluir(l: Lancamento) {
@@ -414,6 +588,15 @@ export default function LancamentosPage() {
         descricao="Notas fiscais de material, mão de obra, serviços e taxas — com NF e comprovante anexados."
       >
         <BotoesRelatorio onPDF={gerarPDF} onXLSX={gerarXLSX} />
+        <button
+          className={btnCls}
+          onClick={() => {
+            setFormParcela({ ...PARCELA_VAZIA, etapa_id: etapas[0]?.id || '' })
+            setModalParcela(true)
+          }}
+        >
+          <Layers className="h-4 w-4" /> Compra parcelada
+        </button>
         <BotaoNovo onClick={abrirNovo}>Novo lançamento</BotaoNovo>
       </TituloSecao>
 
@@ -431,6 +614,93 @@ export default function LancamentosPage() {
           detalhe="pagamentos marcados como pagos"
         />
       </div>
+
+      {/* compras parceladas */}
+      {parcelamentos.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setMostrarParcelas(!mostrarParcelas)}
+            className="mb-2 flex items-center gap-1 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700"
+          >
+            {mostrarParcelas ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            Compras parceladas ({parcelamentos.length})
+          </button>
+
+          {mostrarParcelas && (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {parcelamentos.map((p) => {
+                const pagas = Number(p.parcelas_pagas)
+                const total = Number(p.qtd_parcelas)
+                const atrasada =
+                  p.proximo_vencimento && p.proximo_vencimento < hoje() ? true : false
+                return (
+                  <Card key={p.id}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-900">{p.descricao}</p>
+                        <p className="text-xs text-gray-500">
+                          {p.fornecedor || 'sem fornecedor'} ·{' '}
+                          {Number(p.valor_entrada) > 0
+                            ? `entrada de ${brl(p.valor_entrada)} + `
+                            : ''}
+                          {total}x de {brl(p.valor_parcela)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => excluirParcelamento(p)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        title="Excluir parcelamento"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="mt-3">
+                      <div className="mb-1 flex justify-between text-xs text-gray-600">
+                        <span>
+                          {pagas} de {total} parcelas pagas
+                        </span>
+                        <span className="tnum">
+                          {brl(p.valor_pago)} de {brl(p.valor_total)}
+                        </span>
+                      </div>
+                      <Barra valor={Number(p.valor_pago)} max={Number(p.valor_total) || 1} />
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <span
+                        className={`flex items-center gap-1 text-xs ${
+                          atrasada ? 'font-medium text-red-600' : 'text-gray-600'
+                        }`}
+                      >
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        {p.proximo_vencimento
+                          ? `${atrasada ? 'Vencida em' : 'Próxima em'} ${dataBR(p.proximo_vencimento)}`
+                          : 'Tudo pago'}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setFiltros({
+                            ...filtros,
+                            parcelamento_id: filtros.parcelamento_id === p.id ? '' : p.id,
+                          })
+                        }
+                        className="text-xs font-medium text-[#1f3a5f] underline"
+                      >
+                        {filtros.parcelamento_id === p.id ? 'mostrar tudo' : 'ver parcelas'}
+                      </button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* filtros */}
       <Card className="no-print mb-4">
@@ -502,6 +772,7 @@ export default function LancamentosPage() {
                   casa: '',
                   status: '',
                   investidor_id: '',
+                  parcelamento_id: '',
                   busca: '',
                   de: '',
                   ate: '',
@@ -538,7 +809,18 @@ export default function LancamentosPage() {
               {filtrados.map((l) => (
                 <Fragment key={l.id}>
                   <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">{dataBR(l.data_emissao)}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">
+                      {dataBR(l.data_emissao)}
+                      {l.status === 'a_pagar' && l.data_vencimento && (
+                        <span
+                          className={`block text-[11px] ${
+                            l.data_vencimento < hoje() ? 'font-medium text-red-600' : 'text-amber-700'
+                          }`}
+                        >
+                          vence {dataBR(l.data_vencimento)}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5">
                       <p className="font-medium text-gray-900">{LABEL_TIPO[l.tipo]}</p>
                       <p className="text-xs text-gray-500">
@@ -551,6 +833,13 @@ export default function LancamentosPage() {
                         {l.nf_numero && <span className="mr-2">NF {l.nf_numero}</span>}
                         {l.descricao}
                       </p>
+                      {l.parcela_num ? (
+                        <span className="mt-1 inline-block">
+                          <Badge tom="azul">
+                            parcela {l.parcela_num}/{l.parcela_total}
+                          </Badge>
+                        </span>
+                      ) : null}
                       {(l.itens_lancamento?.length || 0) > 0 && (
                         <button
                           onClick={() => setExpandido(expandido === l.id ? null : l.id)}
@@ -730,7 +1019,20 @@ export default function LancamentosPage() {
           </Campo>
 
           <Campo label="Fornecedor / Prestador" className="sm:col-span-2">
-            <input className={inputCls} value={form.fornecedor} onChange={(e) => setForm({ ...form, fornecedor: e.target.value })} placeholder="Ex.: Depósito Lagoa Materiais" />
+            <>
+              <input
+                className={inputCls}
+                list="lista-fornecedores"
+                value={form.fornecedor}
+                onChange={(e) => setForm({ ...form, fornecedor: e.target.value })}
+                placeholder="Ex.: Depósito Lagoa Materiais"
+              />
+              <datalist id="lista-fornecedores">
+                {fornecedores.map((f) => (
+                  <option key={f.id} value={f.nome} />
+                ))}
+              </datalist>
+            </>
           </Campo>
           <Campo label="Nº da nota fiscal">
             <InputDigitos
@@ -754,9 +1056,23 @@ export default function LancamentosPage() {
               <option value="a_pagar">A pagar</option>
             </select>
           </Campo>
-          {form.status === 'pago' && (
+          {form.status === 'pago' ? (
             <Campo label="Data do pagamento">
-              <input type="date" className={inputCls} value={form.data_pagamento} onChange={(e) => setForm({ ...form, data_pagamento: e.target.value })} />
+              <input
+                type="date"
+                className={inputCls}
+                value={form.data_pagamento}
+                onChange={(e) => setForm({ ...form, data_pagamento: e.target.value })}
+              />
+            </Campo>
+          ) : (
+            <Campo label="Vencimento">
+              <input
+                type="date"
+                className={inputCls}
+                value={form.data_vencimento}
+                onChange={(e) => setForm({ ...form, data_vencimento: e.target.value })}
+              />
             </Campo>
           )}
 
@@ -922,6 +1238,214 @@ export default function LancamentosPage() {
           <button className={btnCls} onClick={() => setModal(false)}>Cancelar</button>
           <button className={btnPrimarioCls} onClick={salvar} disabled={salvando}>
             <Save className="h-4 w-4" /> {salvando ? 'Salvando...' : 'Salvar lançamento'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* ---------- modal de compra parcelada ---------- */}
+      <Modal
+        aberto={modalParcela}
+        titulo="Compra parcelada"
+        onFechar={() => setModalParcela(false)}
+        largura="max-w-2xl"
+      >
+        <p className="mb-4 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          Gera a entrada e todas as parcelas de uma vez. Cada parcela vira um lançamento a pagar
+          com seu vencimento, então entra no orçamento, no caixa e nos relatórios como qualquer
+          outra conta.
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Campo label="O que foi comprado" className="sm:col-span-2">
+            <input
+              className={inputCls}
+              value={formParcela.descricao}
+              onChange={(e) => setFormParcela({ ...formParcela, descricao: e.target.value })}
+              placeholder="Ex.: Lote 12 — quadra 4"
+            />
+          </Campo>
+          <Campo label="Vendedor / Fornecedor">
+            <input
+              className={inputCls}
+              list="lista-fornecedores"
+              value={formParcela.fornecedor}
+              onChange={(e) => setFormParcela({ ...formParcela, fornecedor: e.target.value })}
+              placeholder="Nome de quem vendeu"
+            />
+          </Campo>
+
+          <Campo label="Tipo">
+            <select
+              className={inputCls}
+              value={formParcela.tipo}
+              onChange={(e) =>
+                setFormParcela({ ...formParcela, tipo: e.target.value as TipoLancamento })
+              }
+            >
+              {Object.entries(LABEL_TIPO).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo label="Etapa">
+            <select
+              className={inputCls}
+              value={formParcela.etapa_id}
+              onChange={(e) => setFormParcela({ ...formParcela, etapa_id: e.target.value })}
+            >
+              <option value="">Sem etapa</option>
+              {opcoesEtapas.map((e) => (
+                <option key={e.id} value={e.id}>{e.rotulo}</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo label="Casa">
+            <select
+              className={inputCls}
+              value={formParcela.casa}
+              onChange={(e) => setFormParcela({ ...formParcela, casa: e.target.value as Casa })}
+            >
+              {Object.entries(LABEL_CASA).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </Campo>
+
+          <Campo label="Valor total da compra (R$)">
+            <InputMoeda
+              className="font-semibold"
+              valor={formParcela.valor_total}
+              onChange={(v) => setFormParcela({ ...formParcela, valor_total: v })}
+            />
+          </Campo>
+          <Campo label="Entrada (R$)" dica="Deixe zerado se não teve entrada">
+            <InputMoeda
+              valor={formParcela.valor_entrada}
+              onChange={(v) => setFormParcela({ ...formParcela, valor_entrada: v })}
+            />
+          </Campo>
+          <Campo label="Data da entrada">
+            <input
+              type="date"
+              className={inputCls}
+              value={formParcela.data_entrada}
+              onChange={(e) => setFormParcela({ ...formParcela, data_entrada: e.target.value })}
+            />
+          </Campo>
+
+          {parseMoeda(formParcela.valor_entrada) > 0 && (
+            <>
+              <Campo label="A entrada já foi paga?" className="sm:col-span-1">
+                <select
+                  className={inputCls}
+                  value={formParcela.entrada_paga ? 'sim' : 'nao'}
+                  onChange={(e) =>
+                    setFormParcela({ ...formParcela, entrada_paga: e.target.value === 'sim' })
+                  }
+                >
+                  <option value="sim">Sim, já paguei</option>
+                  <option value="nao">Ainda não</option>
+                </select>
+              </Campo>
+              <Campo label="Entrada paga por" className="sm:col-span-2">
+                <select
+                  className={inputCls}
+                  value={formParcela.investidor_id}
+                  onChange={(e) =>
+                    setFormParcela({ ...formParcela, investidor_id: e.target.value })
+                  }
+                >
+                  <option value="">Caixa da obra / não definido</option>
+                  {investidores.map((i) => (
+                    <option key={i.id} value={i.id}>{i.nome}</option>
+                  ))}
+                </select>
+              </Campo>
+            </>
+          )}
+
+          <Campo label="Quantidade de parcelas">
+            <InputDigitos
+              className="tnum text-right"
+              valor={formParcela.qtd_parcelas}
+              onChange={(v) => setFormParcela({ ...formParcela, qtd_parcelas: v })}
+              max={3}
+              placeholder="12"
+            />
+          </Campo>
+          <Campo label="Vencimento da 1ª parcela" className="sm:col-span-2">
+            <input
+              type="date"
+              className={inputCls}
+              value={formParcela.primeiro_vencimento}
+              onChange={(e) =>
+                setFormParcela({ ...formParcela, primeiro_vencimento: e.target.value })
+              }
+            />
+          </Campo>
+
+          <Campo label="Observação" className="sm:col-span-3">
+            <input
+              className={inputCls}
+              value={formParcela.observacao}
+              onChange={(e) => setFormParcela({ ...formParcela, observacao: e.target.value })}
+              placeholder="Contrato, cartório, condições..."
+            />
+          </Campo>
+        </div>
+
+        {/* previa do que vai ser gerado */}
+        <div className="mt-4 rounded-lg border border-[#1f3a5f]/20 bg-[#1f3a5f]/5 p-3">
+          {(() => {
+            const total = parseMoeda(formParcela.valor_total)
+            const entrada = parseMoeda(formParcela.valor_entrada)
+            const qtd = Number(formParcela.qtd_parcelas) || 0
+            const lista = gerarParcelas({
+              valorTotal: total,
+              entrada,
+              quantidade: qtd,
+              primeiroVencimento: formParcela.primeiro_vencimento,
+            })
+            if (lista.length === 0) {
+              return (
+                <p className="text-xs text-gray-500">
+                  Preencha o valor total e a quantidade de parcelas para ver a prévia.
+                </p>
+              )
+            }
+            const cheia = valorParcela(total, entrada, qtd)
+            const ultima = lista[lista.length - 1]
+            const ajuste = Math.abs(ultima.valor - cheia) >= 0.01
+            return (
+              <>
+                <p className="text-sm font-medium text-[#1f3a5f]">
+                  Vai gerar {entrada > 0 ? '1 entrada + ' : ''}
+                  {lista.length} parcela(s) de {brl(cheia)}
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  {entrada > 0 && (
+                    <>
+                      Entrada de {brl(entrada)} em {dataBR(formParcela.data_entrada)}
+                      {formParcela.entrada_paga ? ' (já paga)' : ' (a pagar)'} ·{' '}
+                    </>
+                  )}
+                  1ª em {dataBR(lista[0].vencimento)} · última em {dataBR(ultima.vencimento)}
+                  {ajuste && ` · a última fica ${brl(ultima.valor)} para fechar a conta`}
+                </p>
+                <p className="tnum mt-1 text-xs text-gray-500">
+                  Soma: {brl(entrada + lista.reduce((s, l) => s + l.valor, 0))} de {brl(total)}
+                </p>
+              </>
+            )
+          })()}
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button className={btnCls} onClick={() => setModalParcela(false)}>
+            Cancelar
+          </button>
+          <button className={btnPrimarioCls} onClick={salvarParcelamento} disabled={salvando}>
+            <Save className="h-4 w-4" /> {salvando ? 'Gerando...' : 'Gerar parcelas'}
           </button>
         </div>
       </Modal>

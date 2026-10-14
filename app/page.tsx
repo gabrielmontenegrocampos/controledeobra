@@ -8,10 +8,11 @@ import {
   ArrowRight,
   Home,
   CalendarDays,
+  CalendarClock,
   Receipt,
 } from 'lucide-react'
 import { supabase, mensagemErro } from '@/lib/supabase'
-import { brl, dataBR, mesBR, num, pct, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
+import { brl, dataBR, hoje, mesBR, num, pct, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import { achatar, montarArvore, totaisGerais } from '@/lib/etapas'
 import type {
@@ -42,13 +43,14 @@ export default function DashboardPage() {
   const [casas, setCasas] = useState<CasasResumo | null>(null)
   const [meses, setMeses] = useState<GastoMensal[]>([])
   const [ultimos, setUltimos] = useState<Lancamento[]>([])
+  const [aVencer, setAVencer] = useState<Lancamento[]>([])
   const [semComprovante, setSemComprovante] = useState(0)
   const [ultimoDiario, setUltimoDiario] = useState<Registro | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
-    const [o, e, c, ca, m, u, sc, d] = await Promise.all([
+    const [o, e, c, ca, m, u, sc, d, av] = await Promise.all([
       supabase.from('obra').select('*').limit(1).maybeSingle(),
       supabase.from('v_etapas_resumo').select('*').order('ordem'),
       supabase.from('v_caixa_resumo').select('*').maybeSingle(),
@@ -65,6 +67,12 @@ export default function DashboardPage() {
         .eq('status', 'pago')
         .is('comprovante_url', null),
       supabase.from('registros').select('*, equipe_dia(*)').order('data', { ascending: false }).limit(1),
+      supabase
+        .from('lancamentos')
+        .select('*, etapas(nome)')
+        .eq('status', 'a_pagar')
+        .order('data_vencimento', { ascending: true })
+        .limit(5),
     ])
 
     if (e.error) setErro(mensagemErro(e.error))
@@ -76,6 +84,7 @@ export default function DashboardPage() {
     if (u.data) setUltimos(u.data as Lancamento[])
     setSemComprovante(sc.count || 0)
     if (d.data && d.data.length) setUltimoDiario(d.data[0] as Registro)
+    if (av.data) setAVencer(av.data as Lancamento[])
     setCarregando(false)
   }, [])
 
@@ -225,6 +234,52 @@ export default function DashboardPage() {
               </li>
             )}
           </ul>
+        </Card>
+      )}
+
+      {/* proximas contas a vencer */}
+      {aVencer.length > 0 && (
+        <Card className="mt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <CalendarClock className="h-4 w-4 text-[#1f3a5f]" /> Próximas contas a vencer
+            </p>
+            <Link
+              href="/lancamentos"
+              className="flex items-center gap-1 text-xs font-medium text-[#1f3a5f] hover:underline"
+            >
+              Ver todas <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {aVencer.map((l) => {
+              const venc = l.data_vencimento || l.data_emissao
+              const atrasada = venc < hoje()
+              return (
+                <div key={l.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">
+                      {l.descricao || l.fornecedor || LABEL_TIPO[l.tipo]}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">
+                      {l.fornecedor ? `${l.fornecedor} · ` : ''}
+                      {l.etapas?.nome || 'sem etapa'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span
+                      className={`text-xs ${
+                        atrasada ? 'font-semibold text-red-600' : 'text-amber-700'
+                      }`}
+                    >
+                      {atrasada ? 'venceu' : 'vence'} {dataBR(venc)}
+                    </span>
+                    <span className="tnum text-sm font-semibold text-gray-900">{brl(l.valor)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </Card>
       )}
 

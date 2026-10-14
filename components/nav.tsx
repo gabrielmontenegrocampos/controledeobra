@@ -11,6 +11,7 @@ import {
   Wallet,
   NotebookPen,
   FolderOpen,
+  Building2,
   Menu,
   X,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ const ITENS = [
   { href: '/orcamento', label: 'Orçamento', Icon: ClipboardList },
   { href: '/lancamentos', label: 'Lançamentos', Icon: Receipt },
   { href: '/materiais', label: 'Materiais', Icon: Package },
+  { href: '/fornecedores', label: 'Fornecedores', Icon: Building2 },
   { href: '/caixa', label: 'Caixa', Icon: Wallet },
   { href: '/diario', label: 'Diário de Obra', Icon: NotebookPen },
   { href: '/arquivos', label: 'Arquivos', Icon: FolderOpen },

@@ -46,6 +46,26 @@ export function apenasDigitos(s: string) {
   return s.replace(/\D/g, '')
 }
 
+/** 14200166000187 -> "14.200.166/0001-87" */
+export function maskCNPJ(v: string | null | undefined) {
+  return (v || '')
+    .replace(/\D/g, '')
+    .slice(0, 14)
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+}
+
+/** 31999998888 -> "(31) 99999-8888" */
+export function maskTelefone(v: string | null | undefined) {
+  const d = (v || '').replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 10) {
+    return d.replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d{1,4})$/, '$1-$2')
+  }
+  return d.replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d{1,4})$/, '$1-$2')
+}
+
 export function dataBR(iso: string | null | undefined) {
   if (!iso) return '—'
   const [a, m, d] = iso.slice(0, 10).split('-')
