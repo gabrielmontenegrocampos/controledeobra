@@ -258,25 +258,25 @@ create policy "anexos_exclusao" on storage.objects for delete using (bucket_id =
 -- 5. DADOS INICIAIS
 -- ------------------------------------------------------------
 insert into obra (nome, endereco, area_m2)
-select 'Obra Lagoa Santa', 'Rua Sabia, 130 e 132 - Vila dos Ypes - Lagoa Santa/MG', 246.16
+select 'Obra Lagoa Santa', 'Rua Sabiá, 130 e 132 — Vila dos Ypês — Lagoa Santa/MG', 246.16
 where not exists (select 1 from obra);
 
 insert into etapas (nome, grupo, ordem)
 select v.nome, v.grupo, v.ordem from (values
-  ('Servicos preliminares',        'Preliminares',  10),
-  ('Fundacao',                     'Estrutura',     20),
+  ('Serviços preliminares',        'Preliminares',  10),
+  ('Fundação',                     'Estrutura',     20),
   ('Estrutura',                    'Estrutura',     30),
-  ('Alvenaria',                    'Vedacao',       40),
-  ('Cobertura',                    'Vedacao',       50),
-  ('Instalacoes eletricas',        'Instalacoes',   60),
-  ('Instalacoes hidrossanitarias', 'Instalacoes',   70),
+  ('Alvenaria',                    'Vedação',       40),
+  ('Cobertura',                    'Vedação',       50),
+  ('Instalações elétricas',        'Instalações',   60),
+  ('Instalações hidrossanitárias', 'Instalações',   70),
   ('Revestimentos',                'Acabamento',    80),
   ('Pisos',                        'Acabamento',    90),
   ('Esquadrias',                   'Acabamento',   100),
   ('Pintura',                      'Acabamento',   110),
-  ('Loucas e metais',              'Acabamento',   120),
+  ('Louças e metais',              'Acabamento',   120),
   ('Limpeza e entrega',            'Entrega',      130),
-  ('Mao de obra',                  'Mao de obra',  140),
-  ('Taxas e documentacao',         'Taxas',        150)
+  ('Mão de obra',                  'Mão de obra',  140),
+  ('Taxas e documentação',         'Taxas',        150)
 ) as v(nome, grupo, ordem)
 where not exists (select 1 from etapas);
