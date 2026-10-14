@@ -166,23 +166,23 @@ export function Modal({
   if (!aberto) return null
 
   return (
-    // o scroll fica no container de fora: com o modal mais alto que a tela,
-    // centralizar por flex cortava o topo e ele ficava inalcancavel
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/40">
-      <div className="flex min-h-full items-start justify-center p-3 sm:items-center sm:p-6">
-        <div className={`w-full ${largura} rounded-xl bg-white shadow-xl`}>
-          <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-gray-200 bg-white px-5 py-3">
-            <h2 className="font-semibold text-gray-900">{titulo}</h2>
-            <button
-              onClick={onFechar}
-              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-              aria-label="Fechar"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="px-5 py-4">{children}</div>
+    // O modal nunca passa da altura da tela: o cabecalho fica parado e
+    // quem rola e o corpo. Assim o topo nao some em janela baixa.
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3 sm:p-6">
+      <div
+        className={`flex w-full ${largura} max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-xl bg-white shadow-xl sm:max-h-[calc(100dvh-3rem)]`}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-3">
+          <h2 className="font-semibold text-gray-900">{titulo}</h2>
+          <button
+            onClick={onFechar}
+            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
       </div>
     </div>
   )
