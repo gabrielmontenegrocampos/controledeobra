@@ -28,6 +28,20 @@ export const supabase = createClient(url || PLACEHOLDER, key || 'placeholder-ano
 
 export const BUCKET = 'anexos'
 
+/**
+ * Traduz o erro do banco para algo acionavel.
+ * Coluna ou tabela que nao existe quase sempre quer dizer que falta
+ * rodar uma migracao nova no Supabase.
+ */
+export function mensagemErro(e: { code?: string; message: string } | null | undefined): string {
+  if (!e) return ''
+  const faltaMigracao = ['42703', '42P01', 'PGRST204', 'PGRST205'].includes(e.code || '')
+  if (faltaMigracao) {
+    return `O banco está desatualizado (${e.message}). Abra o SQL Editor do Supabase e rode o arquivo supabase/schema.sql — ele é idempotente e aplica tudo o que falta.`
+  }
+  return e.message
+}
+
 /** Apaga do bucket um arquivo a partir da sua URL publica */
 export async function removerArquivo(urlPublica: string) {
   const marca = `/object/public/${BUCKET}/`

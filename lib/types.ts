@@ -43,6 +43,9 @@ export type InvestidorResumo = {
   qtd_aportes: number
   ultimo_aporte: string | null
   perc_participacao: number
+  total_pago_contas: number
+  qtd_contas: number
+  total_geral: number
 }
 
 export type Aporte = {
@@ -80,6 +83,7 @@ export type Lancamento = {
   forma_pagamento: string | null
   nf_url: string | null
   comprovante_url: string | null
+  investidor_id: string | null
   etapas?: { nome: string } | null
   itens_lancamento?: ItemLancamento[]
 }
@@ -102,6 +106,9 @@ export type CaixaResumo = {
   total_pago: number
   total_a_pagar: number
   saldo: number
+  pago_investidores: number
+  pago_sem_investidor: number
+  total_investido: number
 }
 
 export type CasasResumo = {

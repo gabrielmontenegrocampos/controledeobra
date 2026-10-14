@@ -13,7 +13,7 @@ previsto × realizado, diário de obra, notas fiscais com comprovante e caixa do
 | **Orçamento** (`/orcamento`) | Etapas da obra: valor previsto e % de avanço (edição direto na tabela) |
 | **Lançamentos** (`/lancamentos`) | NF de material, mão de obra, serviços e taxas — com itens da nota, NF e comprovante anexados. Importa o **XML da NF-e** e preenche tudo sozinho |
 | **Materiais** (`/materiais`) | Consolidado por material: quantidade comprada, preço médio e histórico de compras |
-| **Caixa** (`/caixa`) | Aportes de cada investidor, participação, saldo e extrato de entradas e saídas |
+| **Caixa** (`/caixa`) | Quanto cada investidor colocou: contas que ele mesmo pagou + aportes em dinheiro, com participação de cada um |
 | **Diário** (`/diario`) | Registro diário: clima, atividades, equipe, ocorrências e fotos |
 | **Arquivos** (`/arquivos`) | Biblioteca de projetos, contratos, alvarás, ARTs e memoriais, com categoria e busca |
 
@@ -21,9 +21,11 @@ Toda seção exporta **PDF** e **Excel**.
 
 ## Como a conta fecha
 
-- **Aporte** = dinheiro que entra (seção Caixa).
-- **Lançamento** = dinheiro que sai, sempre ligado a uma etapa e a uma casa (Casa 01, Casa 02 ou Comum).
-- Saldo em caixa = aportes − lançamentos pagos.
+- **Lançamento** = dinheiro que sai, sempre ligado a uma etapa e a uma casa (Casa 01, Casa 02 ou Comum),
+  e com o investidor que pagou aquela conta.
+- **Aporte** = dinheiro entregue ao caixa comum, sem ser para uma conta específica.
+- Total investido por sócio = contas que ele pagou + aportes dele.
+- Saldo do caixa comum = aportes − contas pagas sem investidor definido.
 - Realizado por etapa = soma dos lançamentos daquela etapa.
 - Custo por casa = lançamentos da casa + metade dos lançamentos comuns.
 

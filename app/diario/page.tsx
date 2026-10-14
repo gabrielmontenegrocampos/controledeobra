@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Pencil, Trash2, Save, Plus, Users, AlertTriangle, Camera, Loader2, FileDown } from 'lucide-react'
-import { supabase, enviarArquivo } from '@/lib/supabase'
+import { supabase, enviarArquivo, mensagemErro } from '@/lib/supabase'
 import { dataBR, hoje, num, LABEL_CLIMA, LABEL_SEVERIDADE, LABEL_TIPO_OCORRENCIA } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { EquipeDia, Foto, Ocorrencia, Registro } from '@/lib/types'
@@ -61,7 +61,7 @@ export default function DiarioPage() {
       .from('registros')
       .select('*, fotos(*), equipe_dia(*), ocorrencias(*)')
       .order('data', { ascending: false })
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else setRegistros((data as Registro[]) || [])
     setCarregando(false)
   }, [])
@@ -131,7 +131,7 @@ export default function DiarioPage() {
       const { error } = await supabase.from('registros').update(payload).eq('id', form.id)
       if (error) {
         setSalvando(false)
-        return setErro(error.message)
+        return setErro(mensagemErro(error))
       }
       await Promise.all([
         supabase.from('equipe_dia').delete().eq('registro_id', form.id),
@@ -143,9 +143,9 @@ export default function DiarioPage() {
       if (error) {
         setSalvando(false)
         return setErro(
-          error.code === '23505' || error.message.includes('duplicate')
+          error.code === '23505' || mensagemErro(error).includes('duplicate')
             ? 'Já existe um registro para esta data. Edite o registro existente.'
-            : error.message
+            : mensagemErro(error)
         )
       }
       registroId = data.id
@@ -172,7 +172,7 @@ export default function DiarioPage() {
   async function excluir(r: Registro) {
     if (!confirm(`Excluir o registro de ${dataBR(r.data)}?`)) return
     const { error } = await supabase.from('registros').delete().eq('id', r.id)
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else carregar()
   }
 

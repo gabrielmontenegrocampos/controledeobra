@@ -2,12 +2,12 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Loader2, X } from 'lucide-react'
-import { supabase, enviarArquivo } from '@/lib/supabase'
+import { supabase, enviarArquivo, mensagemErro } from '@/lib/supabase'
 import { lerNFe } from '@/lib/nfe'
 import { comDescendentes, nomeCompleto } from '@/lib/etapas'
 import { brl, dataBR, hoje, num, parseMoeda, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
-import type { Casa, Etapa, Lancamento, StatusLancamento, TipoLancamento } from '@/lib/types'
+import type { Casa, Etapa, Investidor, Lancamento, StatusLancamento, TipoLancamento } from '@/lib/types'
 import { Anexo } from '@/components/anexo'
 import {
   AvisoConfig,
@@ -43,6 +43,7 @@ type Form = {
   valorAuto: boolean
   status: StatusLancamento
   forma_pagamento: string
+  investidor_id: string
   nf_url: string | null
   comprovante_url: string | null
   itens: ItemForm[]
@@ -61,6 +62,7 @@ const FORM_VAZIO: Form = {
   valorAuto: true,
   status: 'pago',
   forma_pagamento: 'Pix',
+  investidor_id: '',
   nf_url: null,
   comprovante_url: null,
   itens: [],
@@ -71,6 +73,7 @@ const ITEM_VAZIO: ItemForm = { material: '', unidade: 'un', quantidade: '1', val
 export default function LancamentosPage() {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [etapas, setEtapas] = useState<Etapa[]>([])
+  const [investidores, setInvestidores] = useState<Investidor[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
@@ -85,23 +88,26 @@ export default function LancamentosPage() {
     etapa_id: '',
     casa: '',
     status: '',
+    investidor_id: '',
     busca: '',
     de: '',
     ate: '',
   })
 
   const carregar = useCallback(async () => {
-    const [lanc, et] = await Promise.all([
+    const [lanc, et, inv] = await Promise.all([
       supabase
         .from('lancamentos')
         .select('*, etapas(nome), itens_lancamento(*)')
         .order('data_emissao', { ascending: false })
         .order('created_at', { ascending: false }),
       supabase.from('etapas').select('*').order('ordem'),
+      supabase.from('investidores').select('*').order('nome'),
     ])
-    if (lanc.error) setErro(lanc.error.message)
+    if (lanc.error) setErro(mensagemErro(lanc.error))
     else setLancamentos((lanc.data as Lancamento[]) || [])
     if (et.data) setEtapas(et.data as Etapa[])
+    if (inv.data) setInvestidores(inv.data as Investidor[])
     setCarregando(false)
   }, [])
 
@@ -129,6 +135,7 @@ export default function LancamentosPage() {
       if (idsEtapa && (!l.etapa_id || !idsEtapa.includes(l.etapa_id))) return false
       if (filtros.casa && l.casa !== filtros.casa) return false
       if (filtros.status && l.status !== filtros.status) return false
+      if (filtros.investidor_id && l.investidor_id !== filtros.investidor_id) return false
       if (filtros.de && l.data_emissao < filtros.de) return false
       if (filtros.ate && l.data_emissao > filtros.ate) return false
       if (b) {
@@ -181,6 +188,7 @@ export default function LancamentosPage() {
       valor: num(l.valor),
       status: l.status,
       forma_pagamento: l.forma_pagamento || '',
+      investidor_id: l.investidor_id || '',
       nf_url: l.nf_url,
       comprovante_url: l.comprovante_url,
       itens: (l.itens_lancamento || []).map((i) => ({
@@ -286,6 +294,7 @@ export default function LancamentosPage() {
       valor: valorFinal,
       status: form.status,
       forma_pagamento: form.forma_pagamento.trim() || null,
+      investidor_id: form.investidor_id || null,
       nf_url: form.nf_url,
       comprovante_url: form.comprovante_url,
     }
@@ -296,14 +305,14 @@ export default function LancamentosPage() {
       const { error } = await supabase.from('lancamentos').update(payload).eq('id', form.id)
       if (error) {
         setSalvando(false)
-        return setErro(error.message)
+        return setErro(mensagemErro(error))
       }
       await supabase.from('itens_lancamento').delete().eq('lancamento_id', form.id)
     } else {
       const { data, error } = await supabase.from('lancamentos').insert(payload).select('id').single()
       if (error) {
         setSalvando(false)
-        return setErro(error.message)
+        return setErro(mensagemErro(error))
       }
       lancamentoId = data.id
     }
@@ -322,7 +331,7 @@ export default function LancamentosPage() {
       const { error } = await supabase.from('itens_lancamento').insert(itens)
       if (error) {
         setSalvando(false)
-        return setErro(error.message)
+        return setErro(mensagemErro(error))
       }
     }
 
@@ -335,17 +344,18 @@ export default function LancamentosPage() {
   async function excluir(l: Lancamento) {
     if (!confirm(`Excluir o lançamento de ${brl(l.valor)}${l.fornecedor ? ` — ${l.fornecedor}` : ''}?`)) return
     const { error } = await supabase.from('lancamentos').delete().eq('id', l.id)
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else carregar()
   }
 
   // ---------- relatorios ----------
-  const colunas = ['Data', 'Tipo', 'Etapa', 'Casa', 'Fornecedor', 'NF', 'Descrição', 'Status', 'Valor']
+  const colunas = ['Data', 'Tipo', 'Etapa', 'Casa', 'Pago por', 'Fornecedor', 'NF', 'Descrição', 'Status', 'Valor']
   const linhas = filtrados.map((l) => [
     dataBR(l.data_emissao),
     LABEL_TIPO[l.tipo],
     nomeCompleto(etapas, l.etapa_id) || '—',
     LABEL_CASA[l.casa],
+    investidores.find((i) => i.id === l.investidor_id)?.nome || '—',
     l.fornecedor || '—',
     l.nf_numero || '—',
     l.descricao || '—',
@@ -365,7 +375,7 @@ export default function LancamentosPage() {
         { rotulo: 'A pagar', valor: brl(aPagar) },
         { rotulo: 'Lançamentos', valor: String(filtrados.length) },
       ],
-      alinharDireita: [8],
+      alinharDireita: [9],
       paisagem: true,
       arquivo: 'lancamentos',
     })
@@ -461,6 +471,18 @@ export default function LancamentosPage() {
               <option value="a_pagar">A pagar</option>
             </select>
           </Campo>
+          <Campo label="Pago por">
+            <select
+              className={inputCls}
+              value={filtros.investidor_id}
+              onChange={(e) => setFiltros({ ...filtros, investidor_id: e.target.value })}
+            >
+              <option value="">Todos</option>
+              {investidores.map((i) => (
+                <option key={i.id} value={i.id}>{i.nome}</option>
+              ))}
+            </select>
+          </Campo>
           <Campo label="De">
             <input type="date" className={inputCls} value={filtros.de} onChange={(e) => setFiltros({ ...filtros, de: e.target.value })} />
           </Campo>
@@ -470,7 +492,18 @@ export default function LancamentosPage() {
           <div className="flex items-end">
             <button
               className={btnCls}
-              onClick={() => setFiltros({ tipo: '', etapa_id: '', casa: '', status: '', busca: '', de: '', ate: '' })}
+              onClick={() =>
+                setFiltros({
+                  tipo: '',
+                  etapa_id: '',
+                  casa: '',
+                  status: '',
+                  investidor_id: '',
+                  busca: '',
+                  de: '',
+                  ate: '',
+                })
+              }
             >
               <X className="h-4 w-4" /> Limpar filtros
             </button>
@@ -484,13 +517,14 @@ export default function LancamentosPage() {
         <Vazio texto="Nenhum lançamento encontrado." />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[1000px] text-sm">
+          <table className="w-full min-w-[1120px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3">Tipo / Etapa</th>
                 <th className="px-4 py-3">Fornecedor / Descrição</th>
                 <th className="px-4 py-3">Casa</th>
+                <th className="px-4 py-3">Pago por</th>
                 <th className="px-4 py-3 text-center">Anexos</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Valor</th>
@@ -525,6 +559,15 @@ export default function LancamentosPage() {
                     </td>
                     <td className="px-4 py-2.5">
                       <Badge tom={l.casa === 'comum' ? 'cinza' : 'azul'}>{LABEL_CASA[l.casa]}</Badge>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs">
+                      {l.investidor_id ? (
+                        <span className="font-medium text-gray-800">
+                          {investidores.find((i) => i.id === l.investidor_id)?.nome || '—'}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center justify-center gap-2">
@@ -565,7 +608,7 @@ export default function LancamentosPage() {
 
                   {expandido === l.id && (
                     <tr className="bg-gray-50/80">
-                      <td colSpan={8} className="px-4 py-3">
+                      <td colSpan={9} className="px-4 py-3">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="text-left text-gray-500">
@@ -598,7 +641,7 @@ export default function LancamentosPage() {
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 font-semibold">
-                <td colSpan={6} className="px-4 py-3">Total filtrado</td>
+                <td colSpan={7} className="px-4 py-3">Total filtrado</td>
                 <td className="tnum px-4 py-3 text-right">{brl(total)}</td>
                 <td />
               </tr>
@@ -712,9 +755,21 @@ export default function LancamentosPage() {
           <Campo label="Forma de pagamento">
             <input className={inputCls} value={form.forma_pagamento} onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })} placeholder="Pix, transferência, dinheiro..." />
           </Campo>
+          <Campo label="Pago por" dica="Qual investidor bancou esta conta">
+            <select
+              className={inputCls}
+              value={form.investidor_id}
+              onChange={(e) => setForm({ ...form, investidor_id: e.target.value })}
+            >
+              <option value="">Caixa da obra / não definido</option>
+              {investidores.map((i) => (
+                <option key={i.id} value={i.id}>{i.nome}</option>
+              ))}
+            </select>
+          </Campo>
+
           <Campo
             label="Valor total (R$)"
-            className="sm:col-span-2"
             dica={
               form.itens.length > 0
                 ? form.valorAuto

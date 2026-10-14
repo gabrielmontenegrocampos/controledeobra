@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Trash2, Save, Pencil, Plus, CornerDownRight } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, mensagemErro } from '@/lib/supabase'
 import { brl, num, parseMoeda, pct } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import { achatar, montarArvore, totaisGerais, type NoEtapa } from '@/lib/etapas'
@@ -52,7 +52,7 @@ export default function OrcamentoPage() {
 
   const carregar = useCallback(async () => {
     const { data, error } = await supabase.from('v_etapas_resumo').select('*').order('ordem')
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else setEtapas((data as EtapaResumo[]) || [])
     setCarregando(false)
   }, [])
@@ -68,7 +68,7 @@ export default function OrcamentoPage() {
 
   async function salvarCampo(id: string, campo: 'valor_previsto' | 'perc_avanco', valor: number) {
     const { error } = await supabase.from('etapas').update({ [campo]: valor }).eq('id', id)
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else carregar()
   }
 
@@ -114,7 +114,7 @@ export default function OrcamentoPage() {
       : await supabase.from('etapas').insert(payload)
 
     setSalvando(false)
-    if (error) return setErro(error.message)
+    if (error) return setErro(mensagemErro(error))
     setForm(FORM_VAZIO)
     setModal(false)
     carregar()
@@ -134,7 +134,7 @@ export default function OrcamentoPage() {
     if (!confirm(aviso)) return
 
     const { error } = await supabase.from('etapas').delete().eq('id', n.id)
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else carregar()
   }
 

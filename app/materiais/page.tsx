@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, mensagemErro } from '@/lib/supabase'
 import { brl, dataBR, num, LABEL_CASA } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { MaterialResumo } from '@/lib/types'
@@ -50,7 +50,7 @@ export default function MateriaisPage() {
         .select('id, material, unidade, quantidade, valor_unit, lancamentos(data_emissao, fornecedor, nf_numero, casa)')
         .order('created_at', { ascending: false }),
     ])
-    if (m.error) setErro(m.error.message)
+    if (m.error) setErro(mensagemErro(m.error))
     else setMateriais((m.data as MaterialResumo[]) || [])
     if (e.data) setEntradas(e.data as unknown as Entrada[])
     setCarregando(false)

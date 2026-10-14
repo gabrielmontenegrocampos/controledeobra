@@ -16,7 +16,7 @@ import {
   Search,
   ExternalLink,
 } from 'lucide-react'
-import { supabase, enviarArquivo, removerArquivo } from '@/lib/supabase'
+import { supabase, enviarArquivo, removerArquivo, mensagemErro } from '@/lib/supabase'
 import { dataBR, hoje, tamanhoArquivo, LABEL_CATEGORIA } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { Arquivo, CategoriaArquivo } from '@/lib/types'
@@ -80,7 +80,7 @@ export default function ArquivosPage() {
       .from('arquivos')
       .select('*')
       .order('created_at', { ascending: false })
-    if (error) setErro(error.message)
+    if (error) setErro(mensagemErro(error))
     else setArquivos((data as Arquivo[]) || [])
     setCarregando(false)
   }, [])
@@ -131,7 +131,7 @@ export default function ArquivosPage() {
           tamanho: file.size,
           data_referencia: novo.data_referencia || null,
         })
-        if (error) throw new Error(error.message)
+        if (error) throw new Error(mensagemErro(error))
       }
       setSelecionados([])
       setNovo({ ...novo, descricao: '' })
@@ -156,7 +156,7 @@ export default function ArquivosPage() {
         data_referencia: edicao.data_referencia || null,
       })
       .eq('id', edicao.id)
-    if (error) return setErro(error.message)
+    if (error) return setErro(mensagemErro(error))
     setEdicao(null)
     carregar()
   }
@@ -164,7 +164,7 @@ export default function ArquivosPage() {
   async function excluir(a: Arquivo) {
     if (!confirm(`Excluir "${a.nome}"? O arquivo também será apagado do armazenamento.`)) return
     const { error } = await supabase.from('arquivos').delete().eq('id', a.id)
-    if (error) return setErro(error.message)
+    if (error) return setErro(mensagemErro(error))
     try {
       await removerArquivo(a.url)
     } catch {

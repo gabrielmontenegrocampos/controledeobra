@@ -75,8 +75,15 @@ create table if not exists lancamentos (
   forma_pagamento  text,
   nf_url           text,
   comprovante_url  text,
+  investidor_id    uuid references investidores(id) on delete set null,
   created_at       timestamptz default now()
 );
+
+-- quem pagou a conta (para bancos criados antes desta coluna existir)
+alter table lancamentos
+  add column if not exists investidor_id uuid references investidores(id) on delete set null;
+
+create index if not exists idx_lanc_investidor on lancamentos(investidor_id);
 
 -- Itens da nota: da a ENTRADA e a QUANTIDADE de cada material
 create table if not exists itens_lancamento (
@@ -179,29 +186,65 @@ left join (
   group by etapa_id
 ) l on l.etapa_id = e.id;
 
--- Caixa: entradas, saidas e saldo
+-- Caixa: quanto cada um colocou na obra
+--   total_investido = aportes em dinheiro + contas pagas direto pelo investidor
+--   saldo           = aportes - contas pagas com o dinheiro do caixa comum
 create or replace view v_caixa_resumo as
 select
   (select coalesce(sum(valor), 0) from aportes) as total_aportado,
   (select coalesce(sum(valor), 0) from lancamentos where status = 'pago') as total_pago,
   (select coalesce(sum(valor), 0) from lancamentos where status = 'a_pagar') as total_a_pagar,
   (select coalesce(sum(valor), 0) from aportes)
-    - (select coalesce(sum(valor), 0) from lancamentos where status = 'pago') as saldo;
+    - (select coalesce(sum(valor), 0) from lancamentos
+       where status = 'pago' and investidor_id is null) as saldo,
+  (select coalesce(sum(valor), 0) from lancamentos
+   where status = 'pago' and investidor_id is not null) as pago_investidores,
+  (select coalesce(sum(valor), 0) from lancamentos
+   where status = 'pago' and investidor_id is null) as pago_sem_investidor,
+  (select coalesce(sum(valor), 0) from aportes)
+    + (select coalesce(sum(valor), 0) from lancamentos
+       where status = 'pago' and investidor_id is not null) as total_investido;
 
--- Quanto cada investidor aportou e sua participacao
+-- Quanto cada investidor colocou: aportes + contas que ele mesmo pagou
 create or replace view v_investidores_resumo as
+with contas as (
+  select investidor_id,
+         sum(valor) as total,
+         count(*)   as qtd,
+         max(coalesce(data_pagamento, data_emissao)) as ultima
+  from lancamentos
+  where status = 'pago' and investidor_id is not null
+  group by investidor_id
+),
+ap as (
+  select investidor_id,
+         sum(valor) as total,
+         count(*)   as qtd,
+         max(data)  as ultima
+  from aportes
+  group by investidor_id
+),
+geral as (
+  select (select coalesce(sum(valor), 0) from aportes)
+       + (select coalesce(sum(valor), 0) from lancamentos
+          where status = 'pago' and investidor_id is not null) as total
+)
 select
   i.id,
   i.nome,
-  coalesce(sum(a.valor), 0) as total_aportado,
-  count(a.id)               as qtd_aportes,
-  max(a.data)               as ultimo_aporte,
-  case when (select sum(valor) from aportes) > 0
-       then round(coalesce(sum(a.valor), 0) / (select sum(valor) from aportes) * 100, 2)
-       else 0 end as perc_participacao
+  coalesce(ap.total, 0) as total_aportado,
+  coalesce(ap.qtd, 0)   as qtd_aportes,
+  ap.ultima             as ultimo_aporte,
+  case when (select total from geral) > 0
+       then round((coalesce(ap.total, 0) + coalesce(c.total, 0))
+                  / (select total from geral) * 100, 2)
+       else 0 end       as perc_participacao,
+  coalesce(c.total, 0)  as total_pago_contas,
+  coalesce(c.qtd, 0)    as qtd_contas,
+  coalesce(ap.total, 0) + coalesce(c.total, 0) as total_geral
 from investidores i
-left join aportes a on a.investidor_id = i.id
-group by i.id, i.nome;
+left join ap      on ap.investidor_id = i.id
+left join contas c on c.investidor_id = i.id;
 
 -- Consolidado de materiais comprados
 create or replace view v_materiais_resumo as

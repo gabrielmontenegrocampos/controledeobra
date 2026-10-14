@@ -10,7 +10,7 @@ import {
   CalendarDays,
   Receipt,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, mensagemErro } from '@/lib/supabase'
 import { brl, dataBR, mesBR, num, pct, LABEL_CASA, LABEL_TIPO } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import { achatar, montarArvore, totaisGerais } from '@/lib/etapas'
@@ -67,7 +67,7 @@ export default function DashboardPage() {
       supabase.from('registros').select('*, equipe_dia(*)').order('data', { ascending: false }).limit(1),
     ])
 
-    if (e.error) setErro(e.error.message)
+    if (e.error) setErro(mensagemErro(e.error))
     if (o.data) setObra(o.data as Obra)
     if (e.data) setEtapas(e.data as EtapaResumo[])
     if (c.data) setCaixa(c.data as CaixaResumo)
@@ -193,7 +193,7 @@ export default function DashboardPage() {
           rotulo="Saldo em caixa"
           valor={brl(saldo)}
           tom={saldo < 0 ? 'negativo' : 'positivo'}
-          detalhe={`Aportado: ${brl(caixa?.total_aportado)}`}
+          detalhe={`Investido na obra: ${brl(caixa?.total_investido)}`}
         />
         <Stat
           rotulo="A pagar"
