@@ -76,6 +76,26 @@ export const LABEL_SEVERIDADE: Record<string, string> = {
   alta: 'Alta',
 }
 
+export const LABEL_CATEGORIA: Record<string, string> = {
+  projeto: 'Projeto',
+  contrato: 'Contrato',
+  alvara: 'Alvará / Licença',
+  art_rrt: 'ART / RRT',
+  orcamento: 'Orçamento',
+  memorial: 'Memorial / Especificação',
+  nota: 'Nota fiscal',
+  outros: 'Outros',
+}
+
+/** 1536000 -> "1,5 MB" */
+export function tamanhoArquivo(bytes: number | null | undefined) {
+  const b = Number(bytes) || 0
+  if (b === 0) return '—'
+  if (b < 1024) return `${b} B`
+  if (b < 1024 * 1024) return `${num(b / 1024, 0)} KB`
+  return `${num(b / (1024 * 1024), 1)} MB`
+}
+
 export const LABEL_TIPO_OCORRENCIA: Record<string, string> = {
   problema: 'Problema',
   desvio: 'Desvio',

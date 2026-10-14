@@ -117,6 +117,23 @@ create table if not exists ocorrencias (
   severidade  text default 'baixa' check (severidade in ('baixa','media','alta'))
 );
 
+-- ---------- BIBLIOTECA DE ARQUIVOS ----------
+create table if not exists arquivos (
+  id              uuid primary key default gen_random_uuid(),
+  nome            text not null,
+  categoria       text not null default 'outros'
+                  check (categoria in ('projeto','contrato','alvara','art_rrt',
+                                       'orcamento','memorial','nota','outros')),
+  descricao       text,
+  url             text not null,
+  tipo_arquivo    text,
+  tamanho         bigint,
+  data_referencia date,
+  created_at      timestamptz default now()
+);
+
+create index if not exists idx_arquivos_categoria on arquivos(categoria);
+create index if not exists idx_arquivos_data on arquivos(created_at desc);
 create index if not exists idx_lanc_etapa  on lancamentos(etapa_id);
 create index if not exists idx_lanc_data   on lancamentos(data_emissao desc);
 create index if not exists idx_itens_lanc  on itens_lancamento(lancamento_id);
@@ -209,6 +226,16 @@ select
   coalesce(sum(valor), 0) as custo_total
 from lancamentos;
 
+-- Biblioteca: resumo por categoria
+create or replace view v_arquivos_resumo as
+select
+  categoria,
+  count(*)                  as quantidade,
+  coalesce(sum(tamanho), 0) as tamanho_total,
+  max(created_at)           as ultimo_envio
+from arquivos
+group by categoria;
+
 -- Gasto por mes (curva da obra)
 create or replace view v_gasto_mensal as
 select
@@ -231,7 +258,8 @@ declare
 begin
   for t in
     select unnest(array['obra','etapas','investidores','aportes','lancamentos',
-                        'itens_lancamento','registros','fotos','equipe_dia','ocorrencias'])
+                        'itens_lancamento','registros','fotos','equipe_dia',
+                        'ocorrencias','arquivos'])
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists "acesso_total" on %I', t);

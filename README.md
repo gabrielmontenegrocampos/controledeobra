@@ -15,6 +15,7 @@ previsto × realizado, diário de obra, notas fiscais com comprovante e caixa do
 | **Materiais** (`/materiais`) | Consolidado por material: quantidade comprada, preço médio e histórico de compras |
 | **Caixa** (`/caixa`) | Aportes de cada investidor, participação, saldo e extrato de entradas e saídas |
 | **Diário** (`/diario`) | Registro diário: clima, atividades, equipe, ocorrências e fotos |
+| **Arquivos** (`/arquivos`) | Biblioteca de projetos, contratos, alvarás, ARTs e memoriais, com categoria e busca |
 
 Toda seção exporta **PDF** e **Excel**.
 
@@ -34,7 +35,11 @@ No painel do Supabase → **SQL Editor** → cole o conteúdo de
 [`supabase/schema.sql`](supabase/schema.sql) e rode.
 
 Isso cria as tabelas, as views do dashboard, as policies, o bucket `anexos`
-(para NF, comprovantes e fotos) e as 15 etapas iniciais.
+(para NF, comprovantes, fotos e a biblioteca de arquivos) e as 15 etapas iniciais.
+
+Se o banco já tinha sido criado antes, rode só as migrações novas que estão em
+[`supabase/migrations/`](supabase/migrations) — ou o `schema.sql` inteiro de novo,
+que é idempotente e não apaga nada.
 
 ### 2. Variáveis de ambiente
 

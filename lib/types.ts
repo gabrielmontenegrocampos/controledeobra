@@ -118,6 +118,28 @@ export type GastoMensal = {
   outros: number
 }
 
+export type CategoriaArquivo =
+  | 'projeto'
+  | 'contrato'
+  | 'alvara'
+  | 'art_rrt'
+  | 'orcamento'
+  | 'memorial'
+  | 'nota'
+  | 'outros'
+
+export type Arquivo = {
+  id: string
+  nome: string
+  categoria: CategoriaArquivo
+  descricao: string | null
+  url: string
+  tipo_arquivo: string | null
+  tamanho: number | null
+  data_referencia: string | null
+  created_at: string
+}
+
 export type Registro = {
   id: string
   data: string

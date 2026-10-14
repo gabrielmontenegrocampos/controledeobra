@@ -28,6 +28,15 @@ export const supabase = createClient(url || PLACEHOLDER, key || 'placeholder-ano
 
 export const BUCKET = 'anexos'
 
+/** Apaga do bucket um arquivo a partir da sua URL publica */
+export async function removerArquivo(urlPublica: string) {
+  const marca = `/object/public/${BUCKET}/`
+  const i = urlPublica.indexOf(marca)
+  if (i === -1) return
+  const caminho = decodeURIComponent(urlPublica.slice(i + marca.length))
+  await supabase.storage.from(BUCKET).remove([caminho])
+}
+
 /** Envia um arquivo para o bucket e devolve a URL publica */
 export async function enviarArquivo(file: File, pasta: string) {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
