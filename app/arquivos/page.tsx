@@ -15,6 +15,8 @@ import {
   Loader2,
   Search,
   ExternalLink,
+  List,
+  LayoutGrid,
 } from 'lucide-react'
 import { supabase, enviarArquivo, removerArquivo, mensagemErro } from '@/lib/supabase'
 import { dataBR, hoje, tamanhoArquivo, LABEL_CATEGORIA } from '@/lib/format'
@@ -74,6 +76,7 @@ export default function ArquivosPage() {
   })
 
   const [edicao, setEdicao] = useState<Arquivo | null>(null)
+  const [visao, setVisao] = useState<'lista' | 'cards'>('lista')
 
   const carregar = useCallback(async () => {
     const { data, error } = await supabase
@@ -212,6 +215,32 @@ export default function ArquivosPage() {
         titulo="Arquivos da Obra"
         descricao="Projetos, contratos, alvarás, ARTs e tudo que precisa ficar à mão."
       >
+        <div className="flex overflow-hidden rounded-lg border border-gray-300">
+          <button
+            type="button"
+            onClick={() => setVisao('lista')}
+            title="Ver em lista"
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition ${
+              visao === 'lista'
+                ? 'bg-[#1f3a5f] text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <List className="h-4 w-4" /> Lista
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisao('cards')}
+            title="Ver em cartões"
+            className={`flex items-center gap-1.5 border-l border-gray-300 px-3 py-2 text-sm font-medium transition ${
+              visao === 'cards'
+                ? 'bg-[#1f3a5f] text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <LayoutGrid className="h-4 w-4" /> Cartões
+          </button>
+        </div>
         <BotoesRelatorio onPDF={gerarPDF} onXLSX={gerarXLSX} />
         <BotaoNovo onClick={() => setModal(true)}>Enviar arquivos</BotaoNovo>
       </TituloSecao>
@@ -276,6 +305,107 @@ export default function ArquivosPage() {
               : 'Nenhum arquivo encontrado com esse filtro.'
           }
         />
+      ) : visao === 'lista' ? (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
+                <th className="px-4 py-3">Arquivo</th>
+                <th className="px-4 py-3">Categoria</th>
+                <th className="px-4 py-3 text-right">Tamanho</th>
+                <th className="px-4 py-3">Referência</th>
+                <th className="px-4 py-3">Enviado em</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtrados.map((a) => {
+                const Icone = iconeDe(a.nome, a.tipo_arquivo)
+                return (
+                  <tr key={a.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-start gap-2">
+                        <Icone className="mt-0.5 h-4 w-4 shrink-0 text-[#1f3a5f]" />
+                        <div className="min-w-0">
+                          <a
+                            href={a.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block truncate font-medium text-gray-900 hover:text-[#1f3a5f] hover:underline"
+                            title={a.nome}
+                          >
+                            {a.nome}
+                          </a>
+                          {a.descricao && (
+                            <p className="truncate text-xs text-gray-500" title={a.descricao}>
+                              {a.descricao}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Badge tom="azul">{LABEL_CATEGORIA[a.categoria]}</Badge>
+                    </td>
+                    <td className="tnum px-4 py-2.5 text-right text-gray-600">
+                      {tamanhoArquivo(a.tamanho)}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {a.data_referencia ? dataBR(a.data_referencia) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">{dataBR(a.created_at)}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-0.5">
+                        <a
+                          href={a.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                          title="Abrir"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                        <a
+                          href={a.url}
+                          download
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                          title="Baixar"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                        <button
+                          onClick={() => setEdicao(a)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => excluir(a)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50 text-xs font-medium text-gray-600">
+                <td colSpan={2} className="px-4 py-2.5">
+                  {filtrados.length} arquivo(s)
+                </td>
+                <td className="tnum px-4 py-2.5 text-right">
+                  {tamanhoArquivo(filtrados.reduce((soma, a) => soma + Number(a.tamanho || 0), 0))}
+                </td>
+                <td colSpan={3} />
+              </tr>
+            </tfoot>
+          </table>
+        </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map((a) => {
