@@ -109,6 +109,31 @@ input[type="number"]::-webkit-inner-spin-button {
     width: 100%;
   }
 
+  /* cartao mais compacto: cabe mais lancamento na tela */
+  .tabela-cartao > tbody > tr > td,
+  .tabela-cartao > tbody > tr > td * {
+    line-height: 1.45;
+  }
+
+  .tabela-cartao > tbody > tr > td {
+    font-size: 13px;
+  }
+
+  /* alvo de toque: botao de acao precisa de dedo, nao de mouse */
+  .tabela-cartao > tbody > tr > td.acoes button,
+  .tabela-cartao > tbody > tr > td.acoes a {
+    min-width: 42px;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tabela-cartao > tbody > tr > td.acoes > div {
+    justify-content: flex-start;
+    gap: 4px;
+  }
+
   .tabela-cartao > tbody > tr > td.acoes {
     margin-top: 6px;
     padding-top: 8px !important;
