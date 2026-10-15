@@ -47,10 +47,12 @@ export function Stat({
   }[tom]
 
   return (
-    <Card>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{rotulo}</p>
-      <p className={`tnum mt-1 text-xl font-bold sm:text-2xl ${cor}`}>{valor}</p>
-      {detalhe && <p className="mt-1 text-xs text-gray-500">{detalhe}</p>}
+    <Card className="p-3 md:p-4">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500 md:text-[11px]">
+        {rotulo}
+      </p>
+      <p className={`tnum mt-0.5 text-lg font-bold md:mt-1 md:text-2xl ${cor}`}>{valor}</p>
+      {detalhe && <p className="mt-0.5 text-[11px] leading-snug text-gray-500 md:mt-1 md:text-xs">{detalhe}</p>}
     </Card>
   )
 }
