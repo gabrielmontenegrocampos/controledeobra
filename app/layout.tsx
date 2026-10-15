@@ -6,8 +6,14 @@ import { Nav } from '@/components/nav'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
 export const metadata: Metadata = {
-  title: 'Controle de Obra — Lagoa Santa',
+  title: 'Controle de Obra',
   description: 'Custos previstos x realizados, diário de obra, notas fiscais e caixa',
+  applicationName: 'Controle de Obra',
+  appleWebApp: {
+    capable: true,
+    title: 'Controle de Obra',
+    statusBarStyle: 'black-translucent',
+  },
 }
 
 export const viewport: Viewport = {

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Controle de Obra">
+  <rect width="512" height="512" rx="112" fill="#1f3a5f"/>
+  <path d="M61 246 L256 92 L451 246 Z" fill="#ffffff"/>
+  <rect x="102" y="246" width="307" height="174" fill="#ffffff"/>
+  <rect x="143" y="358" width="51" height="62" fill="#b8893b"/>
+  <rect x="225" y="317" width="51" height="103" fill="#b8893b"/>
+  <rect x="307" y="277" width="51" height="143" fill="#b8893b"/>
+</svg>
