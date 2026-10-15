@@ -7,6 +7,11 @@ import {
   FileSpreadsheet,
   FileCode,
   File as FileIcon,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  FolderInput,
+  CornerLeftUp,
   Download,
   Trash2,
   Pencil,
@@ -17,11 +22,13 @@ import {
   ExternalLink,
   List,
   LayoutGrid,
+  ChevronRight,
+  Home,
 } from 'lucide-react'
 import { supabase, enviarArquivo, removerArquivo, mensagemErro } from '@/lib/supabase'
 import { dataBR, hoje, tamanhoArquivo, LABEL_CATEGORIA } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
-import type { Arquivo, CategoriaArquivo } from '@/lib/types'
+import type { Arquivo, CategoriaArquivo, Pasta } from '@/lib/types'
 import {
   AvisoConfig,
   Badge,
@@ -42,6 +49,8 @@ import {
 
 const LIMITE_MB = 50
 
+type Arrastado = { tipo: 'arquivo' | 'pasta'; id: string; nome: string }
+
 function iconeDe(nome: string, tipo: string | null) {
   const ext = nome.split('.').pop()?.toLowerCase() || ''
   if (tipo?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext))
@@ -58,12 +67,50 @@ function semExtensao(nome: string) {
   return i > 0 ? nome.slice(0, i) : nome
 }
 
+/** Da raiz ate a pasta, na ordem de leitura */
+function caminhoDaPasta(pastas: Pasta[], id: string | null): Pasta[] {
+  const mapa = new Map(pastas.map((p) => [p.id, p]))
+  const caminho: Pasta[] = []
+  let atual = id ? mapa.get(id) : undefined
+  let guarda = 0
+  while (atual && guarda++ < 20) {
+    caminho.unshift(atual)
+    atual = atual.pasta_pai_id ? mapa.get(atual.pasta_pai_id) : undefined
+  }
+  return caminho
+}
+
+function caminhoTexto(pastas: Pasta[], id: string | null) {
+  const c = caminhoDaPasta(pastas, id)
+  return c.length ? c.map((p) => p.nome).join(' / ') : 'Raiz'
+}
+
+/** A pasta e tudo dentro dela, para nao deixar mover uma pasta para dentro de si mesma */
+function pastaComDescendentes(pastas: Pasta[], id: string): string[] {
+  const resultado = [id]
+  const fila = [id]
+  let guarda = 0
+  while (fila.length && guarda++ < 500) {
+    const atual = fila.shift()!
+    pastas
+      .filter((p) => p.pasta_pai_id === atual)
+      .forEach((f) => {
+        resultado.push(f.id)
+        fila.push(f.id)
+      })
+  }
+  return resultado
+}
+
 export default function ArquivosPage() {
   const [arquivos, setArquivos] = useState<Arquivo[]>([])
+  const [pastas, setPastas] = useState<Pasta[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [visao, setVisao] = useState<'lista' | 'cards'>('lista')
+  const [pastaAtual, setPastaAtual] = useState<string | null>(null)
 
   const [modal, setModal] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -76,15 +123,22 @@ export default function ArquivosPage() {
   })
 
   const [edicao, setEdicao] = useState<Arquivo | null>(null)
-  const [visao, setVisao] = useState<'lista' | 'cards'>('lista')
+  const [pastaEmEdicao, setPastaEmEdicao] = useState<Pasta | null>(null)
+  const [modalPasta, setModalPasta] = useState(false)
+  const [nomePasta, setNomePasta] = useState('')
+  const [aMover, setAMover] = useState<Arrastado | null>(null)
+
+  const [arrastando, setArrastando] = useState<Arrastado | null>(null)
+  const [alvo, setAlvo] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('arquivos')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) setErro(mensagemErro(error))
-    else setArquivos((data as Arquivo[]) || [])
+    const [arq, pas] = await Promise.all([
+      supabase.from('arquivos').select('*').order('created_at', { ascending: false }),
+      supabase.from('pastas').select('*').order('nome'),
+    ])
+    if (arq.error) setErro(mensagemErro(arq.error))
+    else setArquivos((arq.data as Arquivo[]) || [])
+    if (pas.data) setPastas(pas.data as Pasta[])
     setCarregando(false)
   }, [])
 
@@ -92,14 +146,44 @@ export default function ArquivosPage() {
     carregar()
   }, [carregar])
 
+  const buscando = busca.trim() !== '' || filtroCategoria !== ''
+
   const filtrados = useMemo(() => {
     const b = busca.trim().toLowerCase()
     return arquivos.filter((a) => {
       if (filtroCategoria && a.categoria !== filtroCategoria) return false
       if (b && !`${a.nome} ${a.descricao || ''}`.toLowerCase().includes(b)) return false
+      // com busca ou filtro ligado, procura em todas as pastas
+      if (!buscando && (a.pasta_id || null) !== pastaAtual) return false
       return true
     })
-  }, [arquivos, busca, filtroCategoria])
+  }, [arquivos, busca, filtroCategoria, buscando, pastaAtual])
+
+  const subpastas = useMemo(
+    () =>
+      buscando
+        ? []
+        : pastas
+            .filter((p) => (p.pasta_pai_id || null) === pastaAtual)
+            .sort((a, b) => a.nome.localeCompare(b.nome)),
+    [pastas, pastaAtual, buscando]
+  )
+
+  const caminho = caminhoDaPasta(pastas, pastaAtual)
+  const pastaDeCima = caminho.length > 1 ? caminho[caminho.length - 2] : null
+
+  const conteudoDaPasta = useCallback(
+    (id: string) => {
+      const dentro = pastaComDescendentes(pastas, id)
+      const arqs = arquivos.filter((a) => a.pasta_id && dentro.includes(a.pasta_id))
+      return {
+        arquivos: arqs.length,
+        subpastas: dentro.length - 1,
+        tamanho: arqs.reduce((s, a) => s + Number(a.tamanho || 0), 0),
+      }
+    },
+    [pastas, arquivos]
+  )
 
   const espacoTotal = arquivos.reduce((s, a) => s + Number(a.tamanho || 0), 0)
   const porCategoria = useMemo(() => {
@@ -108,6 +192,111 @@ export default function ArquivosPage() {
     return m
   }, [arquivos])
 
+  // opcoes de pasta para os seletores, com indentacao
+  const opcoesPastas = useMemo(() => {
+    const monta = (paiId: string | null, nivel: number): { id: string; rotulo: string }[] =>
+      pastas
+        .filter((p) => (p.pasta_pai_id || null) === paiId)
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .flatMap((p) => [
+          {
+            id: p.id,
+            rotulo: `${'   '.repeat(nivel)}${nivel > 0 ? '› ' : ''}${p.nome}`,
+          },
+          ...monta(p.id, nivel + 1),
+        ])
+    return monta(null, 0)
+  }, [pastas])
+
+  // ---------------- pastas ----------------
+  async function salvarPasta() {
+    const nome = nomePasta.trim()
+    if (!nome) return
+    const { error } = pastaEmEdicao
+      ? await supabase.from('pastas').update({ nome }).eq('id', pastaEmEdicao.id)
+      : await supabase.from('pastas').insert({ nome, pasta_pai_id: pastaAtual })
+    if (error) return setErro(mensagemErro(error))
+    setNomePasta('')
+    setPastaEmEdicao(null)
+    setModalPasta(false)
+    carregar()
+  }
+
+  async function excluirPasta(p: Pasta) {
+    const dentro = conteudoDaPasta(p.id)
+    const aviso =
+      dentro.arquivos > 0 || dentro.subpastas > 0
+        ? `"${p.nome}" tem ${dentro.subpastas} subpasta(s) e ${dentro.arquivos} arquivo(s). As subpastas somem e os arquivos voltam para a raiz — nenhum arquivo é apagado. Continuar?`
+        : `Excluir a pasta "${p.nome}"?`
+    if (!confirm(aviso)) return
+    const { error } = await supabase.from('pastas').delete().eq('id', p.id)
+    if (error) setErro(mensagemErro(error))
+    else carregar()
+  }
+
+  /** Move arquivo ou pasta para dentro do destino (null = raiz) */
+  async function moverPara(item: Arrastado, destino: string | null) {
+    setAlvo(null)
+    setArrastando(null)
+
+    if (item.tipo === 'pasta') {
+      if (destino === item.id) return
+      if (destino && pastaComDescendentes(pastas, item.id).includes(destino)) {
+        setAMover(null)
+        return setErro(`Não dá para mover "${item.nome}" para dentro dela mesma.`)
+      }
+      const { error } = await supabase
+        .from('pastas')
+        .update({ pasta_pai_id: destino })
+        .eq('id', item.id)
+      if (error) return setErro(mensagemErro(error))
+    } else {
+      const { error } = await supabase
+        .from('arquivos')
+        .update({ pasta_id: destino })
+        .eq('id', item.id)
+      if (error) return setErro(mensagemErro(error))
+    }
+    setAMover(null)
+    carregar()
+  }
+
+  // ---------------- arrastar e soltar ----------------
+  function aoComecarArrasto(e: React.DragEvent, item: Arrastado) {
+    e.dataTransfer.setData('text/plain', JSON.stringify(item))
+    e.dataTransfer.effectAllowed = 'move'
+    setArrastando(item)
+  }
+
+  function aoSoltar(e: React.DragEvent, destino: string | null) {
+    e.preventDefault()
+    let item = arrastando
+    try {
+      const bruto = e.dataTransfer.getData('text/plain')
+      if (bruto) item = JSON.parse(bruto) as Arrastado
+    } catch {
+      // mantem o que ficou no estado
+    }
+    if (item) moverPara(item, destino)
+  }
+
+  function propsDestino(destino: string | null, chave: string) {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        if (arrastando?.tipo === 'pasta' && arrastando.id === destino) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move' as const
+        setAlvo(chave)
+      },
+      onDragLeave: () => setAlvo((a) => (a === chave ? null : a)),
+      onDrop: (e: React.DragEvent) => aoSoltar(e, destino),
+    }
+  }
+
+  const realce = (chave: string) =>
+    alvo === chave ? 'ring-2 ring-[#1f3a5f] ring-offset-1 bg-[#1f3a5f]/5' : ''
+
+  // ---------------- arquivos ----------------
   async function enviar() {
     if (selecionados.length === 0) return
     const grandes = selecionados.filter((f) => f.size > LIMITE_MB * 1024 * 1024)
@@ -133,6 +322,7 @@ export default function ArquivosPage() {
           tipo_arquivo: file.type || null,
           tamanho: file.size,
           data_referencia: novo.data_referencia || null,
+          pasta_id: pastaAtual,
         })
         if (error) throw new Error(mensagemErro(error))
       }
@@ -157,6 +347,7 @@ export default function ArquivosPage() {
         categoria: edicao.categoria,
         descricao: edicao.descricao?.trim() || null,
         data_referencia: edicao.data_referencia || null,
+        pasta_id: edicao.pasta_id,
       })
       .eq('id', edicao.id)
     if (error) return setErro(mensagemErro(error))
@@ -176,44 +367,50 @@ export default function ArquivosPage() {
     carregar()
   }
 
-  // ---------- relatorios ----------
-  const colunas = ['Nome', 'Categoria', 'Descrição', 'Data de referência', 'Tamanho', 'Enviado em', 'Link']
-  const linhas = filtrados.map((a) => [
+  // ---------------- relatorios ----------------
+  const colunas = ['Nome', 'Pasta', 'Categoria', 'Descrição', 'Referência', 'Tamanho', 'Enviado em']
+  const linhaDe = (a: Arquivo) => [
     a.nome,
+    caminhoTexto(pastas, a.pasta_id),
     LABEL_CATEGORIA[a.categoria],
     a.descricao || '—',
     a.data_referencia ? dataBR(a.data_referencia) : '—',
     tamanhoArquivo(a.tamanho),
     dataBR(a.created_at),
-    a.url,
-  ])
+  ]
+  const linhas = filtrados.map(linhaDe)
 
   function gerarPDF() {
     exportarPDF({
       titulo: 'Biblioteca de Arquivos da Obra',
-      subtitulo: `${filtrados.length} arquivo(s)`,
-      colunas: colunas.slice(0, 6),
-      linhas: linhas.map((l) => l.slice(0, 6)),
+      subtitulo: buscando
+        ? `${filtrados.length} arquivo(s) encontrado(s)`
+        : `Pasta: ${caminhoTexto(pastas, pastaAtual)}`,
+      colunas,
+      linhas,
       resumo: [
-        { rotulo: 'Arquivos', valor: String(arquivos.length) },
+        { rotulo: 'Arquivos no total', valor: String(arquivos.length) },
+        { rotulo: 'Pastas', valor: String(pastas.length) },
         { rotulo: 'Espaço usado', valor: tamanhoArquivo(espacoTotal) },
-        { rotulo: 'Categorias', valor: String(porCategoria.size) },
       ],
-      alinharDireita: [4],
+      alinharDireita: [5],
       paisagem: true,
       arquivo: 'biblioteca-arquivos',
     })
   }
 
   function gerarXLSX() {
-    exportarXLSX('biblioteca-arquivos', [{ nome: 'Arquivos', colunas, linhas }])
+    exportarXLSX('biblioteca-arquivos', [
+      { nome: 'Pasta atual', colunas, linhas },
+      { nome: 'Todos os arquivos', colunas, linhas: arquivos.map(linhaDe) },
+    ])
   }
 
   return (
     <>
       <TituloSecao
         titulo="Arquivos da Obra"
-        descricao="Projetos, contratos, alvarás, ARTs e tudo que precisa ficar à mão."
+        descricao="Projetos, contratos, alvarás e ARTs. Arraste o arquivo sobre a pasta para organizar."
       >
         <div className="flex overflow-hidden rounded-lg border border-gray-300">
           <button
@@ -221,9 +418,7 @@ export default function ArquivosPage() {
             onClick={() => setVisao('lista')}
             title="Ver em lista"
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition ${
-              visao === 'lista'
-                ? 'bg-[#1f3a5f] text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
+              visao === 'lista' ? 'bg-[#1f3a5f] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
             <List className="h-4 w-4" /> Lista
@@ -233,23 +428,32 @@ export default function ArquivosPage() {
             onClick={() => setVisao('cards')}
             title="Ver em cartões"
             className={`flex items-center gap-1.5 border-l border-gray-300 px-3 py-2 text-sm font-medium transition ${
-              visao === 'cards'
-                ? 'bg-[#1f3a5f] text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
+              visao === 'cards' ? 'bg-[#1f3a5f] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
             <LayoutGrid className="h-4 w-4" /> Cartões
           </button>
         </div>
         <BotoesRelatorio onPDF={gerarPDF} onXLSX={gerarXLSX} />
+        <button
+          className={btnCls}
+          onClick={() => {
+            setPastaEmEdicao(null)
+            setNomePasta('')
+            setModalPasta(true)
+          }}
+        >
+          <FolderPlus className="h-4 w-4" /> Nova pasta
+        </button>
         <BotaoNovo onClick={() => setModal(true)}>Enviar arquivos</BotaoNovo>
       </TituloSecao>
 
       <AvisoConfig />
       <Erro mensagem={erro} />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat rotulo="Arquivos guardados" valor={String(arquivos.length)} tom="destaque" />
+        <Stat rotulo="Pastas" valor={String(pastas.length)} />
         <Stat rotulo="Espaço usado" valor={tamanhoArquivo(espacoTotal)} />
         <Stat rotulo="Categorias em uso" valor={String(porCategoria.size)} />
       </div>
@@ -261,7 +465,7 @@ export default function ArquivosPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               className={`${inputCls} pl-9`}
-              placeholder="Nome ou descrição..."
+              placeholder="Nome ou descrição... (procura em todas as pastas)"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
             />
@@ -295,23 +499,57 @@ export default function ArquivosPage() {
         </div>
       </Card>
 
+      {/* caminho das pastas */}
+      <div className="no-print mb-3 flex flex-wrap items-center gap-1 text-sm">
+        <button
+          onClick={() => setPastaAtual(null)}
+          {...propsDestino(null, 'raiz')}
+          className={`flex items-center gap-1 rounded-lg px-2 py-1 transition ${
+            pastaAtual === null ? 'font-semibold text-gray-900' : 'text-[#1f3a5f] hover:bg-gray-100'
+          } ${realce('raiz')}`}
+        >
+          <Home className="h-3.5 w-3.5" /> Raiz
+        </button>
+        {caminho.map((p, i) => (
+          <span key={p.id} className="flex items-center gap-1">
+            <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+            <button
+              onClick={() => setPastaAtual(p.id)}
+              {...propsDestino(p.id, `crumb-${p.id}`)}
+              className={`rounded-lg px-2 py-1 transition ${
+                i === caminho.length - 1
+                  ? 'font-semibold text-gray-900'
+                  : 'text-[#1f3a5f] hover:bg-gray-100'
+              } ${realce(`crumb-${p.id}`)}`}
+            >
+              {p.nome}
+            </button>
+          </span>
+        ))}
+        {buscando && (
+          <span className="ml-2 text-xs text-amber-700">resultados de todas as pastas</span>
+        )}
+      </div>
+
       {carregando ? (
         <Carregando />
-      ) : filtrados.length === 0 ? (
+      ) : subpastas.length === 0 && filtrados.length === 0 ? (
         <Vazio
           texto={
-            arquivos.length === 0
-              ? 'Nenhum arquivo ainda. Clique em "Enviar arquivos" para subir os projetos e contratos.'
-              : 'Nenhum arquivo encontrado com esse filtro.'
+            arquivos.length === 0 && pastas.length === 0
+              ? 'Nenhum arquivo ainda. Crie uma pasta ou envie os projetos e contratos.'
+              : buscando
+                ? 'Nenhum arquivo encontrado com esse filtro.'
+                : 'Esta pasta está vazia. Arraste arquivos de outra pasta ou envie novos aqui.'
           }
         />
       ) : visao === 'lista' ? (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[880px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
-                <th className="px-4 py-3">Arquivo</th>
-                <th className="px-4 py-3">Categoria</th>
+                <th className="px-4 py-3">Nome</th>
+                <th className="px-4 py-3">{buscando ? 'Pasta' : 'Categoria'}</th>
                 <th className="px-4 py-3 text-right">Tamanho</th>
                 <th className="px-4 py-3">Referência</th>
                 <th className="px-4 py-3">Enviado em</th>
@@ -319,10 +557,99 @@ export default function ArquivosPage() {
               </tr>
             </thead>
             <tbody>
+              {!buscando && pastaAtual && (
+                <tr
+                  {...propsDestino(pastaDeCima ? pastaDeCima.id : null, 'voltar')}
+                  onClick={() => setPastaAtual(pastaDeCima ? pastaDeCima.id : null)}
+                  className={`cursor-pointer border-b border-gray-100 text-gray-500 hover:bg-gray-50 ${realce('voltar')}`}
+                >
+                  <td className="px-4 py-2" colSpan={6}>
+                    <span className="flex items-center gap-2">
+                      <CornerLeftUp className="h-4 w-4" /> Voltar para{' '}
+                      {pastaDeCima ? pastaDeCima.nome : 'Raiz'}
+                    </span>
+                  </td>
+                </tr>
+              )}
+
+              {subpastas.map((p) => {
+                const dentro = conteudoDaPasta(p.id)
+                return (
+                  <tr
+                    key={p.id}
+                    draggable
+                    onDragStart={(e) => aoComecarArrasto(e, { tipo: 'pasta', id: p.id, nome: p.nome })}
+                    onDragEnd={() => setArrastando(null)}
+                    {...propsDestino(p.id, `pasta-${p.id}`)}
+                    className={`border-b border-gray-100 hover:bg-gray-50/60 ${realce(`pasta-${p.id}`)} ${
+                      arrastando?.id === p.id ? 'opacity-40' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => setPastaAtual(p.id)}
+                        className="flex items-center gap-2 font-medium text-gray-900 hover:text-[#1f3a5f]"
+                      >
+                        <Folder className="h-4 w-4 shrink-0 text-[#b8893b]" />
+                        {p.nome}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-gray-500">
+                      {dentro.arquivos} arquivo(s)
+                      {dentro.subpastas > 0 && ` · ${dentro.subpastas} subpasta(s)`}
+                    </td>
+                    <td className="tnum px-4 py-2.5 text-right text-gray-600">
+                      {dentro.tamanho > 0 ? tamanhoArquivo(dentro.tamanho) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5" />
+                    <td className="px-4 py-2.5" />
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-0.5">
+                        <button
+                          onClick={() => setAMover({ tipo: 'pasta', id: p.id, nome: p.nome })}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                          title="Mover para outra pasta"
+                        >
+                          <FolderInput className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPastaEmEdicao(p)
+                            setNomePasta(p.nome)
+                            setModalPasta(true)
+                          }}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                          title="Renomear"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => excluirPasta(p)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          title="Excluir pasta"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+
               {filtrados.map((a) => {
                 const Icone = iconeDe(a.nome, a.tipo_arquivo)
                 return (
-                  <tr key={a.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                  <tr
+                    key={a.id}
+                    draggable
+                    onDragStart={(e) =>
+                      aoComecarArrasto(e, { tipo: 'arquivo', id: a.id, nome: a.nome })
+                    }
+                    onDragEnd={() => setArrastando(null)}
+                    className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 ${
+                      arrastando?.id === a.id ? 'opacity-40' : ''
+                    }`}
+                  >
                     <td className="px-4 py-2.5">
                       <div className="flex items-start gap-2">
                         <Icone className="mt-0.5 h-4 w-4 shrink-0 text-[#1f3a5f]" />
@@ -345,7 +672,13 @@ export default function ArquivosPage() {
                       </div>
                     </td>
                     <td className="px-4 py-2.5">
-                      <Badge tom="azul">{LABEL_CATEGORIA[a.categoria]}</Badge>
+                      {buscando ? (
+                        <span className="text-xs text-gray-600">
+                          {caminhoTexto(pastas, a.pasta_id)}
+                        </span>
+                      ) : (
+                        <Badge tom="azul">{LABEL_CATEGORIA[a.categoria]}</Badge>
+                      )}
                     </td>
                     <td className="tnum px-4 py-2.5 text-right text-gray-600">
                       {tamanhoArquivo(a.tamanho)}
@@ -356,6 +689,13 @@ export default function ArquivosPage() {
                     <td className="px-4 py-2.5 text-gray-600">{dataBR(a.created_at)}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex justify-end gap-0.5">
+                        <button
+                          onClick={() => setAMover({ tipo: 'arquivo', id: a.id, nome: a.nome })}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                          title="Mover para outra pasta"
+                        >
+                          <FolderInput className="h-4 w-4" />
+                        </button>
                         <a
                           href={a.url}
                           target="_blank"
@@ -396,6 +736,7 @@ export default function ArquivosPage() {
             <tfoot>
               <tr className="bg-gray-50 text-xs font-medium text-gray-600">
                 <td colSpan={2} className="px-4 py-2.5">
+                  {subpastas.length > 0 && `${subpastas.length} pasta(s) · `}
                   {filtrados.length} arquivo(s)
                 </td>
                 <td className="tnum px-4 py-2.5 text-right">
@@ -408,11 +749,91 @@ export default function ArquivosPage() {
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {!buscando && pastaAtual && (
+            <button
+              {...propsDestino(pastaDeCima ? pastaDeCima.id : null, 'voltar')}
+              onClick={() => setPastaAtual(pastaDeCima ? pastaDeCima.id : null)}
+              className={`flex items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500 hover:border-gray-400 ${realce('voltar')}`}
+            >
+              <CornerLeftUp className="h-4 w-4" /> Voltar para{' '}
+              {pastaDeCima ? pastaDeCima.nome : 'Raiz'}
+            </button>
+          )}
+
+          {subpastas.map((p) => {
+            const dentro = conteudoDaPasta(p.id)
+            return (
+              <div
+                key={p.id}
+                draggable
+                onDragStart={(e) => aoComecarArrasto(e, { tipo: 'pasta', id: p.id, nome: p.nome })}
+                onDragEnd={() => setArrastando(null)}
+                {...propsDestino(p.id, `pasta-${p.id}`)}
+                className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition ${realce(
+                  `pasta-${p.id}`
+                )} ${arrastando?.id === p.id ? 'opacity-40' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <button
+                    onClick={() => setPastaAtual(p.id)}
+                    className="flex min-w-0 items-center gap-2 text-left"
+                  >
+                    <FolderOpen className="h-5 w-5 shrink-0 text-[#b8893b]" />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-gray-900">{p.nome}</span>
+                      <span className="block text-xs text-gray-500">
+                        {dentro.arquivos} arquivo(s)
+                        {dentro.subpastas > 0 && ` · ${dentro.subpastas} subpasta(s)`}
+                      </span>
+                    </span>
+                  </button>
+                  <div className="flex shrink-0 gap-0.5">
+                    <button
+                      onClick={() => setAMover({ tipo: 'pasta', id: p.id, nome: p.nome })}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                      title="Mover"
+                    >
+                      <FolderInput className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPastaEmEdicao(p)
+                        setNomePasta(p.nome)
+                        setModalPasta(true)
+                      }}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                      title="Renomear"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => excluirPasta(p)}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
           {filtrados.map((a) => {
             const Icone = iconeDe(a.nome, a.tipo_arquivo)
             return (
-              <Card key={a.id} className="flex flex-col">
-                <div className="flex items-start gap-3">
+              <Card
+                key={a.id}
+                className={`flex flex-col ${arrastando?.id === a.id ? 'opacity-40' : ''}`}
+              >
+                <div
+                  draggable
+                  onDragStart={(e) =>
+                    aoComecarArrasto(e, { tipo: 'arquivo', id: a.id, nome: a.nome })
+                  }
+                  onDragEnd={() => setArrastando(null)}
+                  className="flex cursor-grab items-start gap-3 active:cursor-grabbing"
+                >
                   <span className="rounded-lg bg-[#1f3a5f]/10 p-2 text-[#1f3a5f]">
                     <Icone className="h-5 w-5" />
                   </span>
@@ -434,6 +855,7 @@ export default function ArquivosPage() {
                 )}
 
                 <p className="mt-2 text-[11px] text-gray-400">
+                  {buscando ? `Em ${caminhoTexto(pastas, a.pasta_id)} · ` : ''}
                   {a.data_referencia ? `Referência: ${dataBR(a.data_referencia)} · ` : ''}
                   Enviado em {dataBR(a.created_at)}
                 </p>
@@ -454,6 +876,13 @@ export default function ArquivosPage() {
                   >
                     <Download className="h-3.5 w-3.5" /> Baixar
                   </a>
+                  <button
+                    onClick={() => setAMover({ tipo: 'arquivo', id: a.id, nome: a.nome })}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
+                    title="Mover"
+                  >
+                    <FolderInput className="h-3.5 w-3.5" />
+                  </button>
                   <button
                     onClick={() => setEdicao(a)}
                     className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]"
@@ -478,7 +907,7 @@ export default function ArquivosPage() {
       {/* ---------- modal de envio ---------- */}
       <Modal
         aberto={modal}
-        titulo="Enviar arquivos"
+        titulo={`Enviar arquivos para ${caminhoTexto(pastas, pastaAtual)}`}
         onFechar={() => !enviando && setModal(false)}
         largura="max-w-xl"
       >
@@ -520,7 +949,9 @@ export default function ArquivosPage() {
             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-6 text-sm text-gray-600 hover:border-[#1f3a5f] hover:bg-gray-100">
               <Upload className="h-5 w-5" />
               Escolher arquivos (pode selecionar vários)
-              <span className="text-[11px] text-gray-400">PDF, imagens, planilhas — até {LIMITE_MB} MB cada</span>
+              <span className="text-[11px] text-gray-400">
+                PDF, imagens, planilhas — até {LIMITE_MB} MB cada
+              </span>
               <input
                 type="file"
                 multiple
@@ -553,7 +984,11 @@ export default function ArquivosPage() {
           <button className={btnCls} onClick={() => setModal(false)} disabled={enviando}>
             Cancelar
           </button>
-          <button className={btnPrimarioCls} onClick={enviar} disabled={enviando || selecionados.length === 0}>
+          <button
+            className={btnPrimarioCls}
+            onClick={enviar}
+            disabled={enviando || selecionados.length === 0}
+          >
             <Upload className="h-4 w-4" />
             {enviando ? 'Enviando...' : `Enviar ${selecionados.length || ''}`}
           </button>
@@ -561,7 +996,12 @@ export default function ArquivosPage() {
       </Modal>
 
       {/* ---------- modal de edicao ---------- */}
-      <Modal aberto={!!edicao} titulo="Editar arquivo" onFechar={() => setEdicao(null)} largura="max-w-lg">
+      <Modal
+        aberto={!!edicao}
+        titulo="Editar arquivo"
+        onFechar={() => setEdicao(null)}
+        largura="max-w-lg"
+      >
         {edicao && (
           <>
             <div className="grid gap-3">
@@ -572,11 +1012,27 @@ export default function ArquivosPage() {
                   onChange={(e) => setEdicao({ ...edicao, nome: e.target.value })}
                 />
               </Campo>
+              <Campo label="Pasta">
+                <select
+                  className={inputCls}
+                  value={edicao.pasta_id || ''}
+                  onChange={(e) => setEdicao({ ...edicao, pasta_id: e.target.value || null })}
+                >
+                  <option value="">Raiz</option>
+                  {opcoesPastas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
               <Campo label="Categoria">
                 <select
                   className={inputCls}
                   value={edicao.categoria}
-                  onChange={(e) => setEdicao({ ...edicao, categoria: e.target.value as CategoriaArquivo })}
+                  onChange={(e) =>
+                    setEdicao({ ...edicao, categoria: e.target.value as CategoriaArquivo })
+                  }
                 >
                   {Object.entries(LABEL_CATEGORIA).map(([k, v]) => (
                     <option key={k} value={k}>
@@ -608,6 +1064,81 @@ export default function ArquivosPage() {
               <button className={btnPrimarioCls} onClick={salvarEdicao}>
                 <Save className="h-4 w-4" /> Salvar
               </button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* ---------- modal de pasta ---------- */}
+      <Modal
+        aberto={modalPasta}
+        titulo={
+          pastaEmEdicao ? 'Renomear pasta' : `Nova pasta em ${caminhoTexto(pastas, pastaAtual)}`
+        }
+        onFechar={() => setModalPasta(false)}
+        largura="max-w-md"
+      >
+        <Campo label="Nome da pasta">
+          <input
+            className={inputCls}
+            value={nomePasta}
+            onChange={(e) => setNomePasta(e.target.value)}
+            placeholder="Ex.: Projetos aprovados"
+            onKeyDown={(e) => e.key === 'Enter' && salvarPasta()}
+          />
+        </Campo>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className={btnCls} onClick={() => setModalPasta(false)}>
+            Cancelar
+          </button>
+          <button className={btnPrimarioCls} onClick={salvarPasta} disabled={!nomePasta.trim()}>
+            <Save className="h-4 w-4" /> Salvar
+          </button>
+        </div>
+      </Modal>
+
+      {/* ---------- modal mover ---------- */}
+      <Modal
+        aberto={!!aMover}
+        titulo={aMover ? `Mover "${aMover.nome}"` : 'Mover'}
+        onFechar={() => setAMover(null)}
+        largura="max-w-md"
+      >
+        {aMover && (
+          <>
+            <p className="mb-3 text-xs text-gray-500">
+              No computador você também pode arrastar o item direto sobre a pasta.
+            </p>
+            <div className="max-h-72 space-y-1 overflow-y-auto">
+              <button
+                onClick={() => moverPara(aMover, null)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100"
+              >
+                <Home className="h-4 w-4 text-gray-400" /> Raiz
+              </button>
+              {opcoesPastas
+                .filter(
+                  (p) =>
+                    !(
+                      aMover.tipo === 'pasta' &&
+                      pastaComDescendentes(pastas, aMover.id).includes(p.id)
+                    )
+                )
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => moverPara(aMover, p.id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100"
+                  >
+                    <Folder className="h-4 w-4 shrink-0 text-[#b8893b]" />
+                    <span className="whitespace-pre">{p.rotulo}</span>
+                  </button>
+                ))}
+              {opcoesPastas.length === 0 && (
+                <p className="px-3 py-4 text-center text-sm text-gray-400">
+                  Nenhuma pasta criada ainda.
+                </p>
+              )}
             </div>
           </>
         )}

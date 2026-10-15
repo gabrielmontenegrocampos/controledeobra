@@ -185,6 +185,18 @@ create table if not exists ocorrencias (
 );
 
 -- ---------- BIBLIOTECA DE ARQUIVOS ----------
+-- pastas podem ficar dentro de outras; apagar a mae apaga as filhas,
+-- mas os arquivos dentro delas voltam para a raiz
+create table if not exists pastas (
+  id           uuid primary key default gen_random_uuid(),
+  nome         text not null,
+  pasta_pai_id uuid references pastas(id) on delete cascade,
+  ordem        integer not null default 0,
+  created_at   timestamptz default now()
+);
+
+create index if not exists idx_pastas_pai on pastas(pasta_pai_id);
+
 create table if not exists arquivos (
   id              uuid primary key default gen_random_uuid(),
   nome            text not null,
@@ -196,8 +208,14 @@ create table if not exists arquivos (
   tipo_arquivo    text,
   tamanho         bigint,
   data_referencia date,
+  pasta_id        uuid references pastas(id) on delete set null,
   created_at      timestamptz default now()
 );
+
+alter table arquivos
+  add column if not exists pasta_id uuid references pastas(id) on delete set null;
+
+create index if not exists idx_arquivos_pasta on arquivos(pasta_id);
 
 create index if not exists idx_arquivos_categoria on arquivos(categoria);
 create index if not exists idx_arquivos_data on arquivos(created_at desc);
@@ -401,7 +419,7 @@ begin
   for t in
     select unnest(array['obra','etapas','investidores','aportes','lancamentos',
                         'itens_lancamento','registros','fotos','equipe_dia',
-                        'ocorrencias','arquivos','fornecedores','parcelamentos'])
+                        'ocorrencias','arquivos','fornecedores','parcelamentos','pastas'])
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists "acesso_total" on %I', t);

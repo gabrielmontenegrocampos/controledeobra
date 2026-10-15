@@ -186,6 +186,13 @@ export type CategoriaArquivo =
   | 'nota'
   | 'outros'
 
+export type Pasta = {
+  id: string
+  nome: string
+  pasta_pai_id: string | null
+  ordem: number
+}
+
 export type Arquivo = {
   id: string
   nome: string
@@ -195,6 +202,7 @@ export type Arquivo = {
   tipo_arquivo: string | null
   tamanho: number | null
   data_referencia: string | null
+  pasta_id: string | null
   created_at: string
 }
 
