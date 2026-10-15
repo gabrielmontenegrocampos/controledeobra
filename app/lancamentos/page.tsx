@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Pencil, Trash2, Save, Plus, Paperclip, FileText, FileCode, Upload, Loader2, X,
-  CalendarClock, Layers, ChevronDown, ChevronRight,
+  CalendarClock, Layers, ChevronDown, ChevronRight, SlidersHorizontal,
 } from 'lucide-react'
 import { supabase, enviarArquivo, mensagemErro } from '@/lib/supabase'
 import { lerNFe } from '@/lib/nfe'
@@ -132,6 +132,7 @@ export default function LancamentosPage() {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   const [parcelamentos, setParcelamentos] = useState<ParcelamentoResumo[]>([])
   const [mostrarParcelas, setMostrarParcelas] = useState(true)
+  const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [modalParcela, setModalParcela] = useState(false)
   const [formParcela, setFormParcela] = useState(PARCELA_VAZIA)
 
@@ -217,6 +218,7 @@ export default function LancamentosPage() {
     })
   }, [lancamentos, filtros, etapas])
 
+  const filtrosAtivos = Object.values(filtros).filter(Boolean).length
   const total = filtrados.reduce((s, l) => s + Number(l.valor), 0)
   const pago = filtrados.filter((l) => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0)
   const aPagar = total - pago
@@ -708,7 +710,28 @@ export default function LancamentosPage() {
 
       {/* filtros */}
       <Card className="no-print mb-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <button
+          onClick={() => setMostrarFiltros(!mostrarFiltros)}
+          className="flex w-full items-center justify-between text-sm font-medium text-gray-700 md:hidden"
+        >
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4" /> Filtros
+            {filtrosAtivos > 0 && (
+              <span className="rounded-full bg-[#1f3a5f] px-2 py-0.5 text-[11px] text-white">
+                {filtrosAtivos}
+              </span>
+            )}
+          </span>
+          {mostrarFiltros ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+
+        <div
+          className={`${mostrarFiltros ? 'mt-3 grid' : 'hidden'} gap-3 sm:grid-cols-2 md:mt-0 md:grid lg:grid-cols-4`}
+        >
           <Campo label="Buscar">
             <input
               className={inputCls}

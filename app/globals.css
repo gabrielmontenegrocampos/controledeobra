@@ -140,6 +140,13 @@ input[type="number"]::-webkit-inner-spin-button {
     border-top: 1px solid #f3f4f6;
   }
 
+  /* no cartao do celular, essas duas saem: aparecem na tabela do
+     computador e dentro do proprio lancamento */
+  .tabela-cartao > tbody > tr > td[data-rotulo="Casa"],
+  .tabela-cartao > tbody > tr > td[data-rotulo="Anexos"] {
+    display: none;
+  }
+
   .tabela-cartao > tbody > tr > td:empty {
     display: none;
   }
