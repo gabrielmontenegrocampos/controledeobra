@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import { X, FileDown, Sheet, Plus, AlertTriangle } from 'lucide-react'
 import { supabaseConfigurado } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 import { apenasDigitos, limparNumerico, num, numEnxuto, parseMoeda } from '@/lib/format'
 
 export const inputCls =
@@ -22,7 +23,7 @@ export function Card({
   className?: string
 }) {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
+    <div className={cn('min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm', className)}>
       {children}
     </div>
   )
@@ -51,7 +52,7 @@ export function Stat({
       <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500 md:text-[11px]">
         {rotulo}
       </p>
-      <p className={`tnum mt-0.5 text-lg font-bold md:mt-1 md:text-2xl ${cor}`}>{valor}</p>
+      <p className={cn("tnum mt-0.5 text-base font-bold sm:text-lg md:mt-1 md:text-2xl", cor)}>{valor}</p>
       {detalhe && <p className="mt-0.5 text-[11px] leading-snug text-gray-500 md:mt-1 md:text-xs">{detalhe}</p>}
     </Card>
   )
