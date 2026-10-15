@@ -163,7 +163,7 @@ export default function MateriaisPage() {
         <Vazio texto="Nenhum material lançado ainda. Registre uma nota com itens em Lançamentos." />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[940px] text-sm">
+          <table className="tabela-cartao w-full min-w-[940px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Material</th>
@@ -186,17 +186,17 @@ export default function MateriaisPage() {
                       className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
                       onClick={() => setAberto(aberto === m.chave ? null : m.chave)}
                     >
-                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                      <td data-rotulo="Material" className="px-4 py-2.5 font-medium text-gray-900">
                         {m.material}
                         <span className="ml-2 text-[11px] font-normal text-[#1f3a5f] underline">
                           {aberto === m.chave ? 'ocultar' : 'histórico'}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600">{m.unidade}</td>
-                      <td className="tnum px-4 py-2.5 text-right">{num(m.qtd_total, 2)}</td>
-                      <td className="tnum px-4 py-2.5 text-right font-semibold">{brl(m.valor_total)}</td>
-                      <td className="tnum px-4 py-2.5 text-right">{brl(m.preco_medio)}</td>
-                      <td className="tnum px-4 py-2.5 text-right text-xs text-gray-600">
+                      <td data-rotulo="Un" className="px-4 py-2.5 text-gray-600">{m.unidade}</td>
+                      <td data-rotulo="Qtd total" className="tnum px-4 py-2.5 text-right">{num(m.qtd_total, 2)}</td>
+                      <td data-rotulo="Valor total" className="tnum px-4 py-2.5 text-right font-semibold">{brl(m.valor_total)}</td>
+                      <td data-rotulo="Preço médio" className="tnum px-4 py-2.5 text-right">{brl(m.preco_medio)}</td>
+                      <td data-rotulo="Faixa de preço" className="tnum px-4 py-2.5 text-right text-xs text-gray-600">
                         {variou ? (
                           <>
                             {brl(m.menor_preco)} — {brl(m.maior_preco)}
@@ -205,8 +205,8 @@ export default function MateriaisPage() {
                           <Badge tom="cinza">preço único</Badge>
                         )}
                       </td>
-                      <td className="tnum px-4 py-2.5 text-center">{m.qtd_compras}</td>
-                      <td className="px-4 py-2.5 text-gray-600">{m.ultima_compra ? dataBR(m.ultima_compra) : '—'}</td>
+                      <td data-rotulo="Compras" className="tnum px-4 py-2.5 text-center">{m.qtd_compras}</td>
+                      <td data-rotulo="Última" className="px-4 py-2.5 text-gray-600">{m.ultima_compra ? dataBR(m.ultima_compra) : '—'}</td>
                     </tr>
 
                     {aberto === m.chave && (

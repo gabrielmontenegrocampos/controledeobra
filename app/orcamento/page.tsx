@@ -227,7 +227,7 @@ export default function OrcamentoPage() {
         <Vazio texto="Nenhuma etapa ainda. Rode o schema.sql no Supabase ou crie a primeira etapa." />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="tabela-cartao w-full min-w-[980px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Etapa</th>
@@ -250,7 +250,7 @@ export default function OrcamentoPage() {
                         filha ? 'bg-gray-50/40' : ''
                       }`}
                     >
-                      <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + n.nivel * 24}px` }}>
+                      <td data-rotulo="Etapa" className="px-4 py-2.5" style={{ paddingLeft: `${16 + n.nivel * 24}px` }}>
                         <span className="flex items-start gap-1.5">
                           {filha && (
                             <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
@@ -273,7 +273,7 @@ export default function OrcamentoPage() {
                         </span>
                       </td>
 
-                      <td className="px-4 py-2.5 text-right">
+                      <td data-rotulo="Previsto (R$)" className="px-4 py-2.5 text-right">
                         {n.temFilhas ? (
                           <span className="tnum block text-gray-700">
                             {brl(n.previstoTotal)}
@@ -301,7 +301,7 @@ export default function OrcamentoPage() {
                         )}
                       </td>
 
-                      <td className="tnum px-4 py-2.5 text-right">
+                      <td data-rotulo="Realizado" className="tnum px-4 py-2.5 text-right">
                         {brl(n.realizadoTotal)}
                         {n.aPagarTotal > 0 && (
                           <span className="block text-[11px] text-amber-700">
@@ -310,7 +310,7 @@ export default function OrcamentoPage() {
                         )}
                       </td>
 
-                      <td
+                      <td data-rotulo="Saldo"
                         className={`tnum px-4 py-2.5 text-right ${
                           estourou ? 'font-semibold text-red-600' : 'text-gray-700'
                         }`}
@@ -318,7 +318,7 @@ export default function OrcamentoPage() {
                         {brl(n.previstoTotal - n.realizadoTotal)}
                       </td>
 
-                      <td className="px-4 py-2.5">
+                      <td data-rotulo="Execução financeira" className="px-4 py-2.5">
                         <Barra
                           valor={n.realizadoTotal}
                           max={n.previstoTotal || n.realizadoTotal}
@@ -331,7 +331,7 @@ export default function OrcamentoPage() {
                         </span>
                       </td>
 
-                      <td className="px-4 py-2.5 text-center">
+                      <td data-rotulo="% Avanço" className="px-4 py-2.5 text-center">
                         {n.temFilhas ? (
                           <span className="tnum block text-gray-700">
                             {pct(n.avancoTotal)}
@@ -356,7 +356,7 @@ export default function OrcamentoPage() {
                         )}
                       </td>
 
-                      <td className="px-4 py-2.5">
+                      <td className="acoes px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">
                           {!filha && (
                             <button
@@ -391,18 +391,18 @@ export default function OrcamentoPage() {
             {semEtapa.total > 0 && (
               <tbody>
                 <tr className="border-t border-amber-200 bg-amber-50">
-                  <td className="px-4 py-2.5">
+                  <td data-rotulo="Etapa" className="px-4 py-2.5">
                     <span className="block font-medium text-amber-900">Sem etapa</span>
                     <span className="block text-xs text-amber-700">
                       {semEtapa.quantidade} lançamento(s) ainda não classificados
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right text-xs text-amber-700">—</td>
-                  <td className="tnum px-4 py-2.5 text-right font-semibold text-amber-900">
+                  <td data-rotulo="Previsto (R$)" className="px-4 py-2.5 text-right text-xs text-amber-700">—</td>
+                  <td data-rotulo="Realizado" className="tnum px-4 py-2.5 text-right font-semibold text-amber-900">
                     {brl(semEtapa.total)}
                   </td>
-                  <td className="px-4 py-2.5 text-right text-xs text-amber-700">—</td>
-                  <td className="px-4 py-2.5 text-xs text-amber-700">
+                  <td data-rotulo="Saldo" className="px-4 py-2.5 text-right text-xs text-amber-700">—</td>
+                  <td data-rotulo="Execução financeira" className="px-4 py-2.5 text-xs text-amber-700">
                     fora da comparação por etapa
                   </td>
                   <td colSpan={2} />
@@ -411,19 +411,19 @@ export default function OrcamentoPage() {
             )}
             <tfoot>
               <tr className="bg-gray-50 font-semibold">
-                <td className="px-4 py-3">Total</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totais.previsto)}</td>
-                <td className="tnum px-4 py-3 text-right">{brl(totais.realizado + semEtapa.total)}</td>
-                <td className="tnum px-4 py-3 text-right">
+                <td data-rotulo="Etapa" className="px-4 py-3">Total</td>
+                <td data-rotulo="Previsto (R$)" className="tnum px-4 py-3 text-right">{brl(totais.previsto)}</td>
+                <td data-rotulo="Realizado" className="tnum px-4 py-3 text-right">{brl(totais.realizado + semEtapa.total)}</td>
+                <td data-rotulo="Saldo" className="tnum px-4 py-3 text-right">
                   {brl(totais.previsto - totais.realizado - semEtapa.total)}
                 </td>
-                <td className="px-4 py-3 text-xs font-normal text-gray-500">
+                <td data-rotulo="Execução financeira" className="px-4 py-3 text-xs font-normal text-gray-500">
                   {totais.previsto > 0
                     ? `${pct(((totais.realizado + semEtapa.total) / totais.previsto) * 100)} do orçamento`
                     : '—'}
                 </td>
-                <td className="tnum px-4 py-3 text-center">{pct(totais.avanco)}</td>
-                <td />
+                <td data-rotulo="% Avanço" className="tnum px-4 py-3 text-center">{pct(totais.avanco)}</td>
+                <td className="acoes" />
               </tr>
             </tfoot>
           </table>

@@ -295,7 +295,7 @@ export default function CaixaPage() {
             <Vazio texto="Nenhum investidor cadastrado. Clique em 'Novo investidor' para criar o primeiro." />
           ) : (
             <Card className="mb-6 overflow-x-auto p-0">
-              <table className="w-full min-w-[820px] text-sm">
+              <table className="tabela-cartao w-full min-w-[820px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                     <th className="px-4 py-3">Investidor</th>
@@ -309,8 +309,8 @@ export default function CaixaPage() {
                 <tbody>
                   {investidores.map((i) => (
                     <tr key={i.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                      <td className="px-4 py-2.5 font-medium text-gray-900">{i.nome}</td>
-                      <td className="tnum px-4 py-2.5 text-center">
+                      <td data-rotulo="Investidor" className="px-4 py-2.5 font-medium text-gray-900">{i.nome}</td>
+                      <td data-rotulo="Contas pagas" className="tnum px-4 py-2.5 text-center">
                         {i.qtd_contas > 0 ? (
                           <button
                             onClick={() =>
@@ -324,12 +324,12 @@ export default function CaixaPage() {
                           <span className="text-gray-300">0</span>
                         )}
                       </td>
-                      <td className="tnum px-4 py-2.5 text-right">{brl(i.total_pago_contas)}</td>
-                      <td className="tnum px-4 py-2.5 text-right text-gray-600">
+                      <td data-rotulo="Valor em contas" className="tnum px-4 py-2.5 text-right">{brl(i.total_pago_contas)}</td>
+                      <td data-rotulo="Aportes" className="tnum px-4 py-2.5 text-right text-gray-600">
                         {brl(i.total_aportado)}
                       </td>
-                      <td className="tnum px-4 py-2.5 text-right font-semibold">{brl(i.total_geral)}</td>
-                      <td className="px-4 py-2.5">
+                      <td data-rotulo="Total investido" className="tnum px-4 py-2.5 text-right font-semibold">{brl(i.total_geral)}</td>
+                      <td data-rotulo="Participação" className="px-4 py-2.5">
                         <Barra valor={Number(i.total_geral)} max={totalInvestido} cor="#b8893b" />
                         <span className="tnum mt-1 block text-[11px] text-gray-500">
                           {pct(i.perc_participacao)}
@@ -340,14 +340,14 @@ export default function CaixaPage() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 font-semibold">
-                    <td className="px-4 py-3">Total</td>
-                    <td className="tnum px-4 py-3 text-center">
+                    <td data-rotulo="Investidor" className="px-4 py-3">Total</td>
+                    <td data-rotulo="Contas pagas" className="tnum px-4 py-3 text-center">
                       {investidores.reduce((s, i) => s + Number(i.qtd_contas), 0)}
                     </td>
-                    <td className="tnum px-4 py-3 text-right">{brl(resumo?.pago_investidores)}</td>
-                    <td className="tnum px-4 py-3 text-right">{brl(resumo?.total_aportado)}</td>
-                    <td className="tnum px-4 py-3 text-right">{brl(totalInvestido)}</td>
-                    <td />
+                    <td data-rotulo="Valor em contas" className="tnum px-4 py-3 text-right">{brl(resumo?.pago_investidores)}</td>
+                    <td data-rotulo="Aportes" className="tnum px-4 py-3 text-right">{brl(resumo?.total_aportado)}</td>
+                    <td data-rotulo="Total investido" className="tnum px-4 py-3 text-right">{brl(totalInvestido)}</td>
+                    <td data-rotulo="Participação" />
                   </tr>
                 </tfoot>
               </table>
@@ -379,7 +379,7 @@ export default function CaixaPage() {
             <Vazio texto="Nenhuma conta paga por investidor ainda. Em Lançamentos, escolha quem pagou no campo 'Pago por'." />
           ) : (
             <Card className="mb-6 overflow-x-auto p-0">
-              <table className="w-full min-w-[820px] text-sm">
+              <table className="tabela-cartao w-full min-w-[820px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                     <th className="px-4 py-3">Data</th>
@@ -393,21 +393,21 @@ export default function CaixaPage() {
                 <tbody>
                   {contasPorInvestidor.map((l) => (
                     <tr key={l.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                      <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">
+                      <td data-rotulo="Data" className="whitespace-nowrap px-4 py-2.5 text-gray-700">
                         {dataBR(l.data_pagamento || l.data_emissao)}
                       </td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                      <td data-rotulo="Investidor" className="px-4 py-2.5 font-medium text-gray-900">
                         {nomeDe(l.investidor_id) || '—'}
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td data-rotulo="Conta" className="px-4 py-2.5">
                         <p className="text-gray-900">{l.fornecedor || l.descricao || '—'}</p>
                         <p className="text-xs text-gray-500">
                           {l.nf_numero ? `NF ${l.nf_numero} · ` : ''}
                           {LABEL_CASA[l.casa]}
                         </p>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600">{l.etapas?.nome || '—'}</td>
-                      <td className="px-4 py-2.5 text-center">
+                      <td data-rotulo="Etapa" className="px-4 py-2.5 text-gray-600">{l.etapas?.nome || '—'}</td>
+                      <td data-rotulo="Compr." className="px-4 py-2.5 text-center">
                         {l.comprovante_url ? (
                           <a
                             href={l.comprovante_url}
@@ -421,7 +421,7 @@ export default function CaixaPage() {
                           <span className="text-xs text-gray-300">—</span>
                         )}
                       </td>
-                      <td className="tnum px-4 py-2.5 text-right font-semibold">{brl(l.valor)}</td>
+                      <td data-rotulo="Valor" className="tnum px-4 py-2.5 text-right font-semibold">{brl(l.valor)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -475,7 +475,7 @@ export default function CaixaPage() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-sm">
+                  <table className="tabela-cartao w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                         <th className="px-4 py-3">Data</th>
@@ -490,13 +490,13 @@ export default function CaixaPage() {
                     <tbody>
                       {aportes.map((a) => (
                         <tr key={a.id} className="border-b border-gray-100 last:border-0">
-                          <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">{dataBR(a.data)}</td>
-                          <td className="px-4 py-2.5 font-medium text-gray-900">
+                          <td data-rotulo="Data" className="whitespace-nowrap px-4 py-2.5 text-gray-700">{dataBR(a.data)}</td>
+                          <td data-rotulo="Investidor" className="px-4 py-2.5 font-medium text-gray-900">
                             {a.investidores?.nome || '—'}
                           </td>
-                          <td className="px-4 py-2.5 text-gray-600">{a.forma || '—'}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{a.observacao || '—'}</td>
-                          <td className="px-4 py-2.5 text-center">
+                          <td data-rotulo="Forma" className="px-4 py-2.5 text-gray-600">{a.forma || '—'}</td>
+                          <td data-rotulo="Observação" className="px-4 py-2.5 text-gray-600">{a.observacao || '—'}</td>
+                          <td data-rotulo="Compr." className="px-4 py-2.5 text-center">
                             {a.comprovante_url ? (
                               <a
                                 href={a.comprovante_url}
@@ -510,10 +510,10 @@ export default function CaixaPage() {
                               <span className="text-xs text-gray-300">—</span>
                             )}
                           </td>
-                          <td className="tnum px-4 py-2.5 text-right font-semibold text-emerald-700">
+                          <td data-rotulo="Valor" className="tnum px-4 py-2.5 text-right font-semibold text-emerald-700">
                             + {brl(a.valor)}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="acoes px-4 py-2.5">
                             <div className="flex justify-end gap-1">
                               <button
                                 onClick={() => abrirEdicao(a)}

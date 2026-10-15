@@ -211,7 +211,7 @@ export default function FornecedoresPage() {
         />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="tabela-cartao w-full min-w-[900px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Fornecedor</th>
@@ -226,37 +226,37 @@ export default function FornecedoresPage() {
             <tbody>
               {filtrados.map((f) => (
                 <tr key={f.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                  <td className="px-4 py-2.5">
+                  <td data-rotulo="Fornecedor" className="px-4 py-2.5">
                     <p className="flex items-center gap-1.5 font-medium text-gray-900">
                       <Building2 className="h-3.5 w-3.5 text-gray-400" />
                       {f.nome}
                     </p>
                     {f.cnpj && <p className="tnum ml-5 text-xs text-gray-500">{maskCNPJ(f.cnpj)}</p>}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-gray-600">
+                  <td data-rotulo="Contato" className="px-4 py-2.5 text-xs text-gray-600">
                     {f.telefone && <p>{maskTelefone(f.telefone)}</p>}
                     {f.email && <p className="truncate">{f.email}</p>}
                     {!f.telefone && !f.email && <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="tnum px-4 py-2.5 text-center">
+                  <td data-rotulo="Lançamentos" className="tnum px-4 py-2.5 text-center">
                     {Number(f.qtd_lancamentos) > 0 ? (
                       f.qtd_lancamentos
                     ) : (
                       <Badge tom="cinza">sem compras</Badge>
                     )}
                   </td>
-                  <td className="tnum px-4 py-2.5 text-right font-semibold">{brl(f.total_comprado)}</td>
-                  <td className="tnum px-4 py-2.5 text-right">
+                  <td data-rotulo="Total comprado" className="tnum px-4 py-2.5 text-right font-semibold">{brl(f.total_comprado)}</td>
+                  <td data-rotulo="Em aberto" className="tnum px-4 py-2.5 text-right">
                     {Number(f.total_a_pagar) > 0 ? (
                       <span className="font-medium text-amber-700">{brl(f.total_a_pagar)}</span>
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-gray-600">
+                  <td data-rotulo="Última compra" className="px-4 py-2.5 text-gray-600">
                     {f.ultima_compra ? dataBR(f.ultima_compra) : '—'}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="acoes px-4 py-2.5">
                     <div className="flex justify-end gap-1">
                       <button
                         onClick={() => abrirEdicao(f)}

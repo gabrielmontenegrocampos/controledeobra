@@ -19,6 +19,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* numeros alinhados em tabelas */
@@ -30,6 +31,107 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* ------------------------------------------------------------------
+   No celular, cada linha da tabela vira um cartao: o cabecalho some e
+   cada celula mostra o proprio rotulo (data-rotulo) do lado esquerdo.
+   Assim ninguem precisa arrastar a tabela para o lado.
+   ------------------------------------------------------------------ */
+@media (max-width: 767px) {
+  .tabela-cartao {
+    min-width: 0 !important;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .tabela-cartao > thead {
+    display: none;
+  }
+
+  .tabela-cartao > tbody,
+  .tabela-cartao > tfoot,
+  .tabela-cartao > tbody > tr,
+  .tabela-cartao > tfoot > tr,
+  .tabela-cartao > tbody > tr > td,
+  .tabela-cartao > tfoot > tr > td {
+    display: block;
+    width: 100%;
+  }
+
+  .tabela-cartao > tbody > tr {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 0 10px 10px;
+    width: auto;
+    background: #fff;
+  }
+
+  .tabela-cartao > tbody > tr:first-child {
+    margin-top: 10px;
+  }
+
+  .tabela-cartao > tbody > tr > td {
+    padding: 3px 0 !important;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+    border: 0;
+  }
+
+  .tabela-cartao > tbody > tr > td[data-rotulo]::before {
+    content: attr(data-rotulo);
+    flex: 0 0 38%;
+    text-align: left;
+    font-size: 11px;
+    line-height: 1.6;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+  }
+
+  /* celula sem rotulo (nome do item, acoes) ocupa a linha inteira */
+  .tabela-cartao > tbody > tr > td:not([data-rotulo]) {
+    text-align: left;
+  }
+
+  .tabela-cartao > tbody > tr > td:not([data-rotulo]) > * {
+    width: 100%;
+  }
+
+  .tabela-cartao > tbody > tr > td.acoes {
+    margin-top: 6px;
+    padding-top: 8px !important;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .tabela-cartao > tbody > tr > td:empty {
+    display: none;
+  }
+
+  .tabela-cartao > tfoot > tr {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .tabela-cartao > tfoot > tr > td {
+    display: inline-flex;
+    width: auto;
+    gap: 8px;
+    padding: 0 !important;
+  }
+
+  .tabela-cartao > tfoot > tr > td::before {
+    flex: none;
+  }
 }
 
 @media print {

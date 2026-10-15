@@ -796,7 +796,7 @@ export default function LancamentosPage() {
         <Vazio texto="Nenhum lançamento encontrado." />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[1120px] text-sm">
+          <table className="tabela-cartao w-full min-w-[1120px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Data</th>
@@ -814,7 +814,7 @@ export default function LancamentosPage() {
               {filtrados.map((l) => (
                 <Fragment key={l.id}>
                   <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">
+                    <td data-rotulo="Data" className="whitespace-nowrap px-4 py-2.5 text-gray-700">
                       {dataBR(l.data_emissao)}
                       {l.status === 'a_pagar' && l.data_vencimento && (
                         <span
@@ -826,13 +826,13 @@ export default function LancamentosPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Tipo / Etapa" className="px-4 py-2.5">
                       <p className="font-medium text-gray-900">{LABEL_TIPO[l.tipo]}</p>
                       <p className="text-xs text-gray-500">
                         {nomeCompleto(etapas, l.etapa_id) || 'sem etapa'}
                       </p>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Fornecedor / Descrição" className="px-4 py-2.5">
                       <p className="font-medium text-gray-900">{l.fornecedor || '—'}</p>
                       <p className="text-xs text-gray-500">
                         {l.nf_numero && <span className="mr-2">NF {l.nf_numero}</span>}
@@ -854,10 +854,10 @@ export default function LancamentosPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Casa" className="px-4 py-2.5">
                       <Badge tom={l.casa === 'comum' ? 'cinza' : 'azul'}>{LABEL_CASA[l.casa]}</Badge>
                     </td>
-                    <td className="px-4 py-2.5 text-xs">
+                    <td data-rotulo="Pago por" className="px-4 py-2.5 text-xs">
                       {l.investidor_id ? (
                         <span className="font-medium text-gray-800">
                           {investidores.find((i) => i.id === l.investidor_id)?.nome || '—'}
@@ -866,7 +866,7 @@ export default function LancamentosPage() {
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Anexos" className="px-4 py-2.5">
                       <div className="flex items-center justify-center gap-2">
                         {l.nf_url && (
                           <a href={l.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-gray-500 hover:text-[#1f3a5f]">
@@ -881,7 +881,7 @@ export default function LancamentosPage() {
                         {!l.nf_url && !l.comprovante_url && <span className="text-xs text-gray-300">—</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Status" className="px-4 py-2.5">
                       {l.status === 'pago' ? (
                         <Badge tom={l.comprovante_url ? 'verde' : 'amarelo'}>
                           {l.comprovante_url ? 'Pago' : 'Pago s/ compr.'}
@@ -890,8 +890,8 @@ export default function LancamentosPage() {
                         <Badge tom="vermelho">A pagar</Badge>
                       )}
                     </td>
-                    <td className="tnum px-4 py-2.5 text-right font-semibold text-gray-900">{brl(l.valor)}</td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Valor" className="tnum px-4 py-2.5 text-right font-semibold text-gray-900">{brl(l.valor)}</td>
+                    <td className="acoes px-4 py-2.5">
                       <div className="flex justify-end gap-1">
                         <button onClick={() => abrirEdicao(l)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#1f3a5f]" title="Editar">
                           <Pencil className="h-4 w-4" />

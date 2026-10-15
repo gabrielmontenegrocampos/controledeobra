@@ -545,7 +545,7 @@ export default function ArquivosPage() {
         />
       ) : visao === 'lista' ? (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[880px] text-sm">
+          <table className="tabela-cartao w-full min-w-[880px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Nome</th>
@@ -585,7 +585,7 @@ export default function ArquivosPage() {
                       arrastando?.id === p.id ? 'opacity-40' : ''
                     }`}
                   >
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Nome" className="px-4 py-2.5">
                       <button
                         onClick={() => setPastaAtual(p.id)}
                         className="flex items-center gap-2 font-medium text-gray-900 hover:text-[#1f3a5f]"
@@ -598,12 +598,12 @@ export default function ArquivosPage() {
                       {dentro.arquivos} arquivo(s)
                       {dentro.subpastas > 0 && ` · ${dentro.subpastas} subpasta(s)`}
                     </td>
-                    <td className="tnum px-4 py-2.5 text-right text-gray-600">
+                    <td data-rotulo="Tamanho" className="tnum px-4 py-2.5 text-right text-gray-600">
                       {dentro.tamanho > 0 ? tamanhoArquivo(dentro.tamanho) : '—'}
                     </td>
-                    <td className="px-4 py-2.5" />
-                    <td className="px-4 py-2.5" />
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Referência" className="px-4 py-2.5" />
+                    <td data-rotulo="Enviado em" className="px-4 py-2.5" />
+                    <td className="acoes px-4 py-2.5">
                       <div className="flex justify-end gap-0.5">
                         <button
                           onClick={() => setAMover({ tipo: 'pasta', id: p.id, nome: p.nome })}
@@ -650,7 +650,7 @@ export default function ArquivosPage() {
                       arrastando?.id === a.id ? 'opacity-40' : ''
                     }`}
                   >
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Nome" className="px-4 py-2.5">
                       <div className="flex items-start gap-2">
                         <Icone className="mt-0.5 h-4 w-4 shrink-0 text-[#1f3a5f]" />
                         <div className="min-w-0">
@@ -680,14 +680,14 @@ export default function ArquivosPage() {
                         <Badge tom="azul">{LABEL_CATEGORIA[a.categoria]}</Badge>
                       )}
                     </td>
-                    <td className="tnum px-4 py-2.5 text-right text-gray-600">
+                    <td data-rotulo="Tamanho" className="tnum px-4 py-2.5 text-right text-gray-600">
                       {tamanhoArquivo(a.tamanho)}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600">
+                    <td data-rotulo="Referência" className="px-4 py-2.5 text-gray-600">
                       {a.data_referencia ? dataBR(a.data_referencia) : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600">{dataBR(a.created_at)}</td>
-                    <td className="px-4 py-2.5">
+                    <td data-rotulo="Enviado em" className="px-4 py-2.5 text-gray-600">{dataBR(a.created_at)}</td>
+                    <td className="acoes px-4 py-2.5">
                       <div className="flex justify-end gap-0.5">
                         <button
                           onClick={() => setAMover({ tipo: 'arquivo', id: a.id, nome: a.nome })}

@@ -6,13 +6,13 @@ import { supabaseConfigurado } from '@/lib/supabase'
 import { apenasDigitos, limparNumerico, num, numEnxuto, parseMoeda } from '@/lib/format'
 
 export const inputCls =
-  'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#1f3a5f] focus:ring-2 focus:ring-[#1f3a5f]/15'
+  'w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base outline-none focus:border-[#1f3a5f] focus:ring-2 focus:ring-[#1f3a5f]/15 md:py-2 md:text-sm'
 
 export const btnCls =
-  'inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50'
+  'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50 md:min-h-0'
 
 export const btnPrimarioCls =
-  'inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#1f3a5f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2b4d79] disabled:opacity-50'
+  'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-[#1f3a5f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2b4d79] disabled:opacity-50 md:min-h-0'
 
 export function Card({
   children,
@@ -108,7 +108,7 @@ export function TituloSecao({
         <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{titulo}</h1>
         {descricao && <p className="mt-0.5 text-sm text-gray-500">{descricao}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
+      <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">{children}</div>
     </div>
   )
 }
