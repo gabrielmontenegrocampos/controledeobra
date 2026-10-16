@@ -7,6 +7,7 @@ import { supabase, enviarArquivo, mensagemErro } from '@/lib/supabase'
 import { dataBR, hoje, num, LABEL_CLIMA, LABEL_SEVERIDADE, LABEL_TIPO_OCORRENCIA } from '@/lib/format'
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { EquipeDia, Foto, Ocorrencia, Registro } from '@/lib/types'
+import { VisorFotos } from '@/components/visor-fotos'
 import {
   AvisoConfig,
   Badge,
@@ -55,6 +56,7 @@ export default function DiarioPage() {
   const [enviandoFoto, setEnviandoFoto] = useState(false)
   const [form, setForm] = useState<Form>(FORM_VAZIO)
   const [periodo, setPeriodo] = useState({ de: '', ate: '' })
+  const [visor, setVisor] = useState<{ fotos: Foto[]; indice: number; titulo: string } | null>(null)
 
   const carregar = useCallback(async () => {
     const { data, error } = await supabase
@@ -339,16 +341,24 @@ export default function DiarioPage() {
                 {(r.fotos?.length || 0) > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {r.fotos!.map((f, i) => (
-                      <a key={f.id || i} href={f.url} target="_blank" rel="noopener noreferrer">
+                      <button
+                        key={f.id || i}
+                        type="button"
+                        onClick={() =>
+                          setVisor({ fotos: r.fotos!, indice: i, titulo: dataBR(r.data) })
+                        }
+                        className="group relative overflow-hidden rounded-lg border border-gray-200"
+                        aria-label={`Ver foto ${i + 1} de ${dataBR(r.data)}`}
+                      >
                         <Image
                           src={f.url}
                           alt={f.legenda || 'Foto da obra'}
                           width={112}
                           height={112}
                           unoptimized
-                          className="h-28 w-28 rounded-lg border border-gray-200 object-cover"
+                          className="h-28 w-28 object-cover transition group-hover:brightness-90"
                         />
-                      </a>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -562,6 +572,16 @@ export default function DiarioPage() {
           </button>
         </div>
       </Modal>
+
+      {visor && (
+        <VisorFotos
+          fotos={visor.fotos}
+          indice={visor.indice}
+          titulo={`Diário de ${visor.titulo}`}
+          onIr={(novo) => setVisor({ ...visor, indice: novo })}
+          onFechar={() => setVisor(null)}
+        />
+      )}
 
       <p className="no-print mt-6 flex items-center gap-1.5 text-xs text-gray-400">
         <FileDown className="h-3.5 w-3.5" /> Use PDF para enviar o diário ao cliente ou ao investidor.
