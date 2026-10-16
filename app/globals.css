@@ -89,6 +89,20 @@ input[type="number"]::-webkit-inner-spin-button {
     min-width: 0;
   }
 
+  /* grade de 2 colunas: tudo que estiver na celula empilha na direita,
+     em vez de virar varias colunas espremidas */
+  .tabela-cartao > tbody > tr > td[data-rotulo] {
+    display: grid;
+    grid-template-columns: minmax(0, 36%) minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: start;
+  }
+
+  .tabela-cartao > tbody > tr > td[data-rotulo] > * {
+    grid-column: 2;
+    min-width: 0;
+  }
+
   .tabela-cartao > tbody > tr > td[data-rotulo]::before {
     content: attr(data-rotulo);
     flex: 0 0 38%;

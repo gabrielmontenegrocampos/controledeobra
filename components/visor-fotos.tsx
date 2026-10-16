@@ -114,7 +114,6 @@ export function VisorFotos({
           src={foto.url}
           alt={foto.legenda || `Foto ${indice + 1}`}
           fill
-          unoptimized
           sizes="100vw"
           className="object-contain"
           onClick={onFechar}
@@ -164,7 +163,7 @@ export function VisorFotos({
               }`}
               aria-label={`Ver foto ${i + 1}`}
             >
-              <Image src={f.url} alt="" fill unoptimized sizes="56px" className="object-cover" />
+              <Image src={f.url} alt="" fill sizes="56px" className="object-cover" />
             </button>
           ))}
         </div>

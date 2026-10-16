@@ -360,7 +360,6 @@ export default function DiarioPage() {
                           alt={f.legenda || 'Foto da obra'}
                           width={112}
                           height={112}
-                          unoptimized
                           className="h-28 w-28 object-cover transition group-hover:brightness-90"
                         />
                       </button>
@@ -550,7 +549,6 @@ export default function DiarioPage() {
                   alt="Foto"
                   width={96}
                   height={96}
-                  unoptimized
                   className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
                 />
                 <button
