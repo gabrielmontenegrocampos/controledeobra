@@ -818,8 +818,100 @@ export default function LancamentosPage() {
       ) : filtrados.length === 0 ? (
         <Vazio texto="Nenhum lançamento encontrado." />
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="tabela-cartao w-full min-w-[1120px] text-sm">
+        <>
+          {/* celular: cartao compacto */}
+          <div className="space-y-2 md:hidden">
+            {filtrados.map((l) => {
+              const venc = l.data_vencimento || l.data_emissao
+              const atrasada = l.status === 'a_pagar' && venc < hoje()
+              return (
+                <div key={l.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                  <button
+                    type="button"
+                    onClick={() => abrirEdicao(l)}
+                    className="flex w-full items-start justify-between gap-3 text-left"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-gray-900">
+                        {l.fornecedor || l.descricao || LABEL_TIPO[l.tipo]}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] text-gray-500">
+                        {dataBR(l.data_emissao)} · {LABEL_TIPO[l.tipo]}
+                        {l.etapas?.nome ? ` · ${l.etapas.nome}` : ''}
+                      </span>
+                    </span>
+                    <span className="tnum shrink-0 text-sm font-semibold text-gray-900">
+                      {brl(l.valor)}
+                    </span>
+                  </button>
+
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      {l.status === 'pago' ? (
+                        <Badge tom={l.comprovante_url ? 'verde' : 'amarelo'}>
+                          {l.comprovante_url ? 'Pago' : 'Pago s/ compr.'}
+                        </Badge>
+                      ) : (
+                        <Badge tom={atrasada ? 'vermelho' : 'amarelo'}>
+                          {atrasada ? 'Vencida' : 'Vence'} {dataBR(venc)}
+                        </Badge>
+                      )}
+                      {l.parcela_num ? (
+                        <Badge tom="azul">
+                          {l.parcela_num}/{l.parcela_total}
+                        </Badge>
+                      ) : null}
+                      {l.investidor_id && (
+                        <span className="truncate text-[11px] text-gray-500">
+                          {investidores.find((i) => i.id === l.investidor_id)?.nome}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      {l.nf_url && (
+                        <a
+                          href={l.nf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 active:bg-gray-100"
+                          title="Nota fiscal"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </a>
+                      )}
+                      {l.comprovante_url && (
+                        <a
+                          href={l.comprovante_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 active:bg-emerald-50"
+                          title="Comprovante"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => excluir(l)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 active:bg-red-50 active:text-red-600"
+                        aria-label="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            <p className="flex items-center justify-between rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600">
+              <span>{filtrados.length} lançamento(s)</span>
+              <span className="tnum">{brl(total)}</span>
+            </p>
+          </div>
+
+        <Card className="hidden overflow-x-auto p-0 md:block">
+          <table className="w-full min-w-[1120px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Data</th>
@@ -968,6 +1060,7 @@ export default function LancamentosPage() {
             </tfoot>
           </table>
         </Card>
+        </>
       )}
 
       {/* ---------- modal ---------- */}

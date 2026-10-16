@@ -210,8 +210,64 @@ export default function FornecedoresPage() {
           }
         />
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="tabela-cartao w-full min-w-[900px] text-sm">
+        <>
+          {/* celular: cartao compacto */}
+          <div className="space-y-2 md:hidden">
+            {filtrados.map((f) => (
+              <div key={f.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-900">{f.nome}</p>
+                    <p className="truncate text-[11px] text-gray-500">
+                      {f.cnpj ? `${maskCNPJ(f.cnpj)} · ` : ''}
+                      {f.qtd_lancamentos} lançamento(s)
+                      {f.ultima_compra ? ` · ${dataBR(f.ultima_compra)}` : ''}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="tnum text-sm font-semibold text-gray-900">
+                      {brl(f.total_comprado)}
+                    </p>
+                    {Number(f.total_a_pagar) > 0 && (
+                      <p className="tnum text-[11px] font-medium text-amber-700">
+                        {brl(f.total_a_pagar)} em aberto
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                  <span className="truncate text-[11px] text-gray-500">
+                    {f.telefone ? maskTelefone(f.telefone) : f.email || ''}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      onClick={() => abrirEdicao(f)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 active:bg-gray-100"
+                      aria-label="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => excluir(f)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 active:bg-red-50 active:text-red-600"
+                      aria-label="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <p className="flex items-center justify-between rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600">
+              <span>{filtrados.length} fornecedor(es)</span>
+              <span className="tnum">{brl(totalComprado)}</span>
+            </p>
+          </div>
+
+        <Card className="hidden overflow-x-auto p-0 md:block">
+          <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">Fornecedor</th>
@@ -289,6 +345,7 @@ export default function FornecedoresPage() {
             </tfoot>
           </table>
         </Card>
+        </>
       )}
 
       <Modal
