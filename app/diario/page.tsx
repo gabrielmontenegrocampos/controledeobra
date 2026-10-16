@@ -8,6 +8,7 @@ import { dataBR, hoje, num, LABEL_CLIMA, LABEL_SEVERIDADE, LABEL_TIPO_OCORRENCIA
 import { exportarPDF, exportarXLSX } from '@/lib/report'
 import type { EquipeDia, Foto, Ocorrencia, Registro } from '@/lib/types'
 import { VisorFotos } from '@/components/visor-fotos'
+import { prepararImagem } from '@/lib/imagem'
 import {
   AvisoConfig,
   Badge,
@@ -102,11 +103,15 @@ export default function DiarioPage() {
     setErro(null)
     try {
       const novas: Foto[] = []
+      const avisos: string[] = []
       for (const f of files) {
-        const url = await enviarArquivo(f, 'diario')
+        const { arquivo, aviso } = await prepararImagem(f)
+        if (aviso) avisos.push(aviso)
+        const url = await enviarArquivo(arquivo, 'diario')
         novas.push({ url, legenda: null })
       }
       setForm((f) => ({ ...f, fotos: [...f.fotos, ...novas] }))
+      if (avisos.length) setErro(avisos.join(' '))
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao enviar foto.')
     } finally {

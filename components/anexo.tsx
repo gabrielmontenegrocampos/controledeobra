@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { Paperclip, ExternalLink, Trash2, Loader2 } from 'lucide-react'
 import { enviarArquivo } from '@/lib/supabase'
+import { prepararImagem } from '@/lib/imagem'
 
 export function Anexo({
   label,
@@ -29,7 +30,9 @@ export function Anexo({
     setErro(null)
     setEnviando(true)
     try {
-      onChange(await enviarArquivo(file, pasta))
+      const { arquivo, aviso } = await prepararImagem(file)
+      if (aviso) setErro(aviso)
+      onChange(await enviarArquivo(arquivo, pasta))
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha no envio.')
     } finally {
