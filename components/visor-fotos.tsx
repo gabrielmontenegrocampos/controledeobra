@@ -122,7 +122,8 @@ export function VisorFotos({
               src={f.url}
               alt={f.legenda || `Foto ${i + 1}`}
               fill
-              sizes="100vw"
+              sizes="(max-width: 768px) 65vw, 1400px"
+              quality={65}
               priority={i === indice}
               onLoad={() => setProntas((p) => ({ ...p, [f.url]: true }))}
               onClick={onFechar}
