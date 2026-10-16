@@ -265,15 +265,20 @@ export default function DiarioPage() {
       </div>
 
       <Card className="no-print mb-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Campo label="De">
             <input type="date" className={inputCls} value={periodo.de} onChange={(e) => setPeriodo({ ...periodo, de: e.target.value })} />
           </Campo>
           <Campo label="Até">
             <input type="date" className={inputCls} value={periodo.ate} onChange={(e) => setPeriodo({ ...periodo, ate: e.target.value })} />
           </Campo>
-          <div className="flex items-end">
-            <button className={btnCls} onClick={() => setPeriodo({ de: '', ate: '' })}>Limpar período</button>
+          <div className="col-span-2 flex items-end sm:col-span-1">
+            <button
+              className={`${btnCls} w-full sm:w-auto`}
+              onClick={() => setPeriodo({ de: '', ate: '' })}
+            >
+              Limpar período
+            </button>
           </div>
         </div>
       </Card>
