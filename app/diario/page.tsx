@@ -344,26 +344,40 @@ export default function DiarioPage() {
                 )}
 
                 {(r.fotos?.length || 0) > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {r.fotos!.map((f, i) => (
-                      <button
-                        key={f.id || i}
-                        type="button"
-                        onClick={() =>
-                          setVisor({ fotos: r.fotos!, indice: i, titulo: dataBR(r.data) })
-                        }
-                        className="group relative overflow-hidden rounded-lg border border-gray-200"
-                        aria-label={`Ver foto ${i + 1} de ${dataBR(r.data)}`}
-                      >
-                        <Image
-                          src={f.url}
-                          alt={f.legenda || 'Foto da obra'}
-                          width={112}
-                          height={112}
-                          className="h-28 w-28 object-cover transition group-hover:brightness-90"
-                        />
-                      </button>
-                    ))}
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                    {r.fotos!.slice(0, 6).map((f, i) => {
+                      const restantes = r.fotos!.length - 6
+                      const ultima = i === 5 && restantes > 0
+                      return (
+                        <button
+                          key={f.id || i}
+                          type="button"
+                          onClick={() =>
+                            setVisor({ fotos: r.fotos!, indice: i, titulo: dataBR(r.data) })
+                          }
+                          className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200"
+                          aria-label={
+                            ultima
+                              ? `Ver as ${r.fotos!.length} fotos de ${dataBR(r.data)}`
+                              : `Ver foto ${i + 1} de ${dataBR(r.data)}`
+                          }
+                        >
+                          <Image
+                            src={f.url}
+                            alt={f.legenda || 'Foto da obra'}
+                            fill
+                            sizes="(max-width: 768px) 33vw, 160px"
+                            quality={65}
+                            className="object-cover transition group-hover:brightness-90"
+                          />
+                          {ultima && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-base font-semibold text-white">
+                              +{restantes}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </Card>
