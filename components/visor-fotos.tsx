@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import { X, ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2 } from 'lucide-react'
 import type { Foto } from '@/lib/types'
 
 /**
@@ -23,6 +23,7 @@ export function VisorFotos({
   titulo?: string
 }) {
   const [toqueX, setToqueX] = useState<number | null>(null)
+  const [prontas, setProntas] = useState<Record<string, boolean>>({})
   const tiraRef = useRef<HTMLDivElement>(null)
 
   const anterior = useCallback(() => {
@@ -109,15 +110,34 @@ export function VisorFotos({
           setToqueX(null)
         }}
       >
-        <Image
-          key={foto.url}
-          src={foto.url}
-          alt={foto.legenda || `Foto ${indice + 1}`}
-          fill
-          sizes="100vw"
-          className="object-contain"
-          onClick={onFechar}
-        />
+        {fotos.map((f, i) => {
+          const vizinha =
+            i === indice ||
+            i === (indice + 1) % fotos.length ||
+            i === (indice - 1 + fotos.length) % fotos.length
+          if (!vizinha) return null
+          return (
+            <Image
+              key={f.url}
+              src={f.url}
+              alt={f.legenda || `Foto ${i + 1}`}
+              fill
+              sizes="100vw"
+              priority={i === indice}
+              onLoad={() => setProntas((p) => ({ ...p, [f.url]: true }))}
+              onClick={onFechar}
+              className={`object-contain transition-opacity duration-200 ${
+                i === indice ? 'opacity-100' : 'pointer-events-none opacity-0'
+              }`}
+            />
+          )
+        })}
+
+        {!prontas[foto.url] && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+          </span>
+        )}
 
         {fotos.length > 1 && (
           <>
