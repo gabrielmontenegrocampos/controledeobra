@@ -360,7 +360,7 @@ export default function DiarioPage() {
                           onClick={() =>
                             setVisor({ fotos: r.fotos!, indice: i, titulo: dataBR(r.data) })
                           }
-                          className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200"
+                          className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100"
                           aria-label={
                             ultima
                               ? `Ver as ${r.fotos!.length} fotos de ${dataBR(r.data)}`
